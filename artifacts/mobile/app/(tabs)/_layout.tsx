@@ -72,14 +72,17 @@ export default function TabLayout() {
           borderTopWidth: 1,
           borderTopColor: colors.border,
           elevation: 0,
-          height: Platform.OS === "web" ? 64 : 84,
-          paddingBottom: Platform.OS === "web" ? 8 : 28,
-          paddingTop: 8,
+          height: Platform.OS === "web" ? 72 : 84,
+          paddingBottom: Platform.OS === "web" ? 10 : 28,
+          paddingTop: 10,
         },
         tabBarLabelStyle: {
           fontSize: 11,
           fontFamily: "Inter_500Medium",
-          marginTop: 2,
+          marginTop: 1,
+        },
+        tabBarIconStyle: {
+          marginBottom: 0,
         },
         tabBarBackground: () =>
           isIOS ? (
