@@ -1,36 +1,39 @@
 const colors = {
   light: {
-    text: "#0f0f0f",
-    tint: "#1a1a2e",
+    text: "#0D1B4B",
+    tint: "#2563EB",
 
-    background: "#f8f7f4",
-    foreground: "#0f0f0f",
+    background: "#EEF1F8",
+    foreground: "#0D1B4B",
 
-    card: "#ffffff",
-    cardForeground: "#0f0f0f",
+    card: "#FFFFFF",
+    cardForeground: "#0D1B4B",
 
-    primary: "#1a1a2e",
-    primaryForeground: "#ffffff",
+    primary: "#2563EB",
+    primaryForeground: "#FFFFFF",
 
-    secondary: "#f0ece4",
-    secondaryForeground: "#1a1a2e",
+    secondary: "#E8EDF8",
+    secondaryForeground: "#2563EB",
 
-    muted: "#f0ece4",
-    mutedForeground: "#8a8275",
+    muted: "#E8EDF8",
+    mutedForeground: "#8A96B0",
 
-    accent: "#c8a96e",
-    accentForeground: "#1a1a2e",
+    accent: "#F59E0B",
+    accentForeground: "#FFFFFF",
 
-    destructive: "#e53e3e",
-    destructiveForeground: "#ffffff",
+    destructive: "#EF4444",
+    destructiveForeground: "#FFFFFF",
 
-    border: "#e8e2d9",
-    input: "#e8e2d9",
+    border: "#DDE3F0",
+    input: "#DDE3F0",
 
-    success: "#2d7a4f",
-    successForeground: "#ffffff",
+    success: "#10B981",
+    successForeground: "#FFFFFF",
+
+    heroBg: "#2563EB",
+    categoryLabel: "#2563EB",
   },
-  radius: 12,
+  radius: 14,
 };
 
 export default colors;
