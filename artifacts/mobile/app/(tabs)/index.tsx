@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   FlatList,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   Image,
   Platform,
   RefreshControl,
@@ -24,9 +23,19 @@ setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
 
 const STORE_NAME = 'ShopAll';
 
-function formatPrice(cents: number, currency = 'usd') {
+function formatPrice(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
 }
+
+const HERO_ICONS: Record<string, string> = {
+  Electronics: 'cpu',
+  Clothing: 'shopping-bag',
+  Home: 'home',
+  Footwear: 'box',
+  Books: 'book',
+  Beauty: 'star',
+  Accessories: 'watch',
+};
 
 export default function ShopScreen() {
   const colors = useColors();
@@ -36,6 +45,7 @@ export default function ShopScreen() {
   const { addToWishlist, removeFromWishlist, isWishlisted } = useWishlist();
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [refreshing, setRefreshing] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
 
   const { data: productsData, isLoading, refetch } = useListProducts(
     selectedCategory ? { category: selectedCategory } : {},
@@ -88,6 +98,24 @@ export default function ShopScreen() {
     }
   };
 
+  const handleShopNow = () => {
+    setSelectedCategory(undefined);
+    setTimeout(() => {
+      flatListRef.current?.scrollToOffset({ offset: 380, animated: true });
+    }, 100);
+  };
+
+  const handleHeroCategoryTap = (cat: string) => {
+    setSelectedCategory(cat);
+    setTimeout(() => {
+      flatListRef.current?.scrollToOffset({ offset: 380, animated: true });
+    }, 100);
+  };
+
+  const handleCategoryFilter = (cat: string | undefined) => {
+    setSelectedCategory(cat);
+  };
+
   const renderFeaturedCard = (item: any) => {
     const price = item.prices?.[0];
     const amt = price?.unit_amount ?? 0;
@@ -110,11 +138,19 @@ export default function ShopScreen() {
           )}
           {badge && (
             <View style={[styles.badgeTag, { backgroundColor: colors.accent }]}>
-              <Text style={styles.badgeTagText}>{badge === 'Sale' ? `-${badge}` : badge}</Text>
+              <Text style={styles.badgeTagText}>{badge}</Text>
             </View>
           )}
-          <TouchableOpacity style={styles.wishlistBtn} onPress={() => handleToggleWishlist(item)}>
-            <Feather name="heart" size={16} color={wishlisted ? colors.primary : colors.mutedForeground} />
+          <TouchableOpacity
+            style={styles.wishlistBtn}
+            onPress={() => handleToggleWishlist(item)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Feather
+              name="heart"
+              size={16}
+              color={wishlisted ? colors.primary : colors.mutedForeground}
+            />
           </TouchableOpacity>
         </View>
         {category ? (
@@ -128,6 +164,7 @@ export default function ShopScreen() {
           <TouchableOpacity
             style={[styles.addBtn, { backgroundColor: colors.primary }]}
             onPress={() => handleAddToCart(item)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           >
             <Feather name="plus" size={16} color="#fff" />
           </TouchableOpacity>
@@ -169,12 +206,17 @@ export default function ShopScreen() {
           <Text style={[styles.rowPrice, { color: colors.foreground }]}>{formatPrice(amt)}</Text>
         </View>
         <View style={styles.rowActions}>
-          <TouchableOpacity onPress={() => handleToggleWishlist(item)} style={styles.heartBtn}>
+          <TouchableOpacity
+            onPress={() => handleToggleWishlist(item)}
+            style={styles.heartBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
             <Feather name="heart" size={18} color={wishlisted ? colors.primary : colors.mutedForeground} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.addBtnSm, { backgroundColor: colors.primary }]}
             onPress={() => handleAddToCart(item)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           >
             <Feather name="plus" size={15} color="#fff" />
           </TouchableOpacity>
@@ -183,6 +225,8 @@ export default function ShopScreen() {
     );
   };
 
+  const heroCats = categories.slice(0, 3);
+
   const ListHeader = () => (
     <>
       {/* Hero Banner */}
@@ -190,20 +234,27 @@ export default function ShopScreen() {
         <View style={styles.heroText}>
           <Text style={styles.heroEyebrow}>NEW ARRIVALS</Text>
           <Text style={styles.heroTitle}>Summer Collection 2026</Text>
-          <TouchableOpacity style={styles.heroBtn}>
+          <TouchableOpacity style={styles.heroBtn} onPress={handleShopNow} activeOpacity={0.85}>
             <Text style={styles.heroBtnText}>Shop Now</Text>
           </TouchableOpacity>
         </View>
-        {categories.length > 0 && (
+        {heroCats.length > 0 && (
           <View style={styles.heroCats}>
-            {categories.slice(0, 3).map((cat, i) => (
+            {heroCats.map((cat, i) => (
               <TouchableOpacity
                 key={cat}
                 style={[styles.heroCatTile, { backgroundColor: i === 0 ? '#E8EDF8' : '#DDE3F0' }]}
-                onPress={() => setSelectedCategory(cat)}
+                onPress={() => handleHeroCategoryTap(cat)}
+                activeOpacity={0.8}
               >
-                <Feather name="grid" size={18} color={colors.primary} />
-                <Text style={[styles.heroCatLabel, { color: colors.foreground }]} numberOfLines={1}>{cat}</Text>
+                <Feather
+                  name={(HERO_ICONS[cat] ?? 'grid') as any}
+                  size={18}
+                  color={colors.primary}
+                />
+                <Text style={[styles.heroCatLabel, { color: colors.foreground }]} numberOfLines={1}>
+                  {cat}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -211,15 +262,19 @@ export default function ShopScreen() {
       </View>
 
       {/* Featured Section */}
-      {featured.length > 0 && (
+      {(isLoading || featured.length > 0) && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Featured</Text>
-            <TouchableOpacity onPress={() => setSelectedCategory(undefined)}>
+            <TouchableOpacity onPress={() => handleCategoryFilter(undefined)}>
               <Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.featuredRow}
+          >
             {isLoading
               ? [0, 1, 2].map((i) => <ProductSkeleton key={i} />)
               : featured.map(renderFeaturedCard)}
@@ -230,28 +285,44 @@ export default function ShopScreen() {
       {/* All Products Header + Category Pills */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>All Products</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
-          <TouchableOpacity
-            style={[styles.pill, { backgroundColor: selectedCategory === undefined ? colors.primary : colors.card, borderColor: colors.border }]}
-            onPress={() => setSelectedCategory(undefined)}
+        {categories.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.pills}
           >
-            <Text style={[styles.pillText, { color: selectedCategory === undefined ? '#fff' : colors.foreground }]}>All</Text>
-          </TouchableOpacity>
-          {categories.map((cat) => (
             <TouchableOpacity
-              key={cat}
-              style={[styles.pill, { backgroundColor: selectedCategory === cat ? colors.primary : colors.card, borderColor: colors.border }]}
-              onPress={() => setSelectedCategory(cat)}
+              style={[
+                styles.pill,
+                {
+                  backgroundColor: selectedCategory === undefined ? colors.primary : colors.card,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => handleCategoryFilter(undefined)}
             >
-              <Text style={[styles.pillText, { color: selectedCategory === cat ? '#fff' : colors.foreground }]}>{cat}</Text>
+              <Text style={[styles.pillText, { color: selectedCategory === undefined ? '#fff' : colors.foreground }]}>All</Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+            {categories.map((cat) => (
+              <TouchableOpacity
+                key={cat}
+                style={[
+                  styles.pill,
+                  {
+                    backgroundColor: selectedCategory === cat ? colors.primary : colors.card,
+                    borderColor: colors.border,
+                  },
+                ]}
+                onPress={() => handleCategoryFilter(cat)}
+              >
+                <Text style={[styles.pillText, { color: selectedCategory === cat ? '#fff' : colors.foreground }]}>{cat}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
       </View>
     </>
   );
-
-  const emptyProduct = products.length === 0 && !isLoading;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -264,17 +335,18 @@ export default function ShopScreen() {
         <TouchableOpacity
           style={[styles.cartIconBtn, { backgroundColor: colors.card }]}
           onPress={() => router.push('/(tabs)/cart')}
+          activeOpacity={0.8}
         >
           <Feather name="shopping-cart" size={20} color={colors.foreground} />
           {cartCount > 0 && (
             <View style={[styles.cartBubble, { backgroundColor: colors.primary }]}>
-              <Text style={styles.cartBubbleText}>{cartCount}</Text>
+              <Text style={styles.cartBubbleText}>{cartCount > 99 ? '99+' : cartCount}</Text>
             </View>
           )}
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar (decorative — taps go to Search tab) */}
+      {/* Search Bar */}
       <TouchableOpacity
         style={[styles.searchBar, { backgroundColor: colors.card }]}
         activeOpacity={0.85}
@@ -285,6 +357,7 @@ export default function ShopScreen() {
       </TouchableOpacity>
 
       <FlatList
+        ref={flatListRef}
         data={isLoading ? [] : products}
         keyExtractor={(item) => item.id}
         renderItem={renderProductRow}
@@ -296,7 +369,7 @@ export default function ShopScreen() {
                 <View key={i} style={[styles.skeletonRow, { backgroundColor: colors.card }]} />
               ))}
             </View>
-          ) : emptyProduct ? (
+          ) : products.length === 0 ? (
             <View style={styles.empty}>
               <Feather name="shopping-bag" size={48} color={colors.mutedForeground} />
               <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No products yet</Text>
@@ -338,11 +411,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     right: 0,
-    width: 16,
+    minWidth: 16,
     height: 16,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 3,
   },
   cartBubbleText: { color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold' },
   searchBar: {
@@ -367,7 +441,13 @@ const styles = StyleSheet.create({
   heroText: { flex: 1, justifyContent: 'center' },
   heroEyebrow: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontFamily: 'Inter_600SemiBold', letterSpacing: 1 },
   heroTitle: { color: '#fff', fontSize: 20, fontFamily: 'Inter_700Bold', marginVertical: 8, lineHeight: 26 },
-  heroBtn: { backgroundColor: '#fff', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, alignSelf: 'flex-start' },
+  heroBtn: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
+  },
   heroBtnText: { color: '#2563EB', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   heroCats: { width: 90, gap: 6, justifyContent: 'center' },
   heroCatTile: {
@@ -416,8 +496,8 @@ const styles = StyleSheet.create({
     right: 8,
     backgroundColor: '#fff',
     borderRadius: 12,
-    width: 26,
-    height: 26,
+    width: 28,
+    height: 28,
     alignItems: 'center',
     justifyContent: 'center',
   },
