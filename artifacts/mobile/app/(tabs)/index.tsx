@@ -17,11 +17,10 @@ import { setBaseUrl, useListProducts, useListCategories } from '@workspace/api-c
 import { useColors } from '@/hooks/useColors';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
+import { useUser } from '@/context/UserContext';
 import { ProductSkeleton } from '@/components/SkeletonLoader';
 
 setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
-
-const STORE_NAME = 'ShopAll';
 
 function formatPrice(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
@@ -43,6 +42,7 @@ export default function ShopScreen() {
   const router = useRouter();
   const { addToCart, totalItems: cartCount } = useCart();
   const { addToWishlist, removeFromWishlist, isWishlisted } = useWishlist();
+  const { user } = useUser();
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [refreshing, setRefreshing] = useState(false);
   const flatListRef = useRef<FlatList>(null);
@@ -98,22 +98,20 @@ export default function ShopScreen() {
     }
   };
 
-  const handleShopNow = () => {
-    setSelectedCategory(undefined);
+  const scrollToProducts = () => {
     setTimeout(() => {
       flatListRef.current?.scrollToOffset({ offset: 380, animated: true });
-    }, 100);
+    }, 80);
+  };
+
+  const handleShopNow = () => {
+    setSelectedCategory(undefined);
+    scrollToProducts();
   };
 
   const handleHeroCategoryTap = (cat: string) => {
     setSelectedCategory(cat);
-    setTimeout(() => {
-      flatListRef.current?.scrollToOffset({ offset: 380, animated: true });
-    }, 100);
-  };
-
-  const handleCategoryFilter = (cat: string | undefined) => {
-    setSelectedCategory(cat);
+    scrollToProducts();
   };
 
   const renderFeaturedCard = (item: any) => {
@@ -127,7 +125,7 @@ export default function ShopScreen() {
       <TouchableOpacity
         key={item.id}
         style={[styles.featuredCard, { backgroundColor: colors.card }]}
-        activeOpacity={0.92}
+        activeOpacity={0.9}
         onPress={() => router.push({ pathname: '/product/[id]', params: { id: item.id } })}
       >
         <View style={[styles.featuredImgBox, { backgroundColor: colors.secondary }]}>
@@ -146,18 +144,10 @@ export default function ShopScreen() {
             onPress={() => handleToggleWishlist(item)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Feather
-              name="heart"
-              size={16}
-              color={wishlisted ? colors.primary : colors.mutedForeground}
-            />
+            <Feather name="heart" size={16} color={wishlisted ? colors.primary : colors.mutedForeground} />
           </TouchableOpacity>
         </View>
-        {category ? (
-          <Text style={[styles.cardCategory, { color: colors.primary }]}>
-            {category.toUpperCase()}
-          </Text>
-        ) : null}
+        {category ? <Text style={[styles.cardCategory, { color: colors.primary }]}>{category.toUpperCase()}</Text> : null}
         <Text style={[styles.cardName, { color: colors.foreground }]} numberOfLines={2}>{item.name}</Text>
         <View style={styles.cardBottom}>
           <Text style={[styles.cardPrice, { color: colors.foreground }]}>{formatPrice(amt)}</Text>
@@ -183,7 +173,7 @@ export default function ShopScreen() {
     return (
       <TouchableOpacity
         style={[styles.productRow, { backgroundColor: colors.card }]}
-        activeOpacity={0.92}
+        activeOpacity={0.9}
         onPress={() => router.push({ pathname: '/product/[id]', params: { id: item.id } })}
       >
         <View style={[styles.rowImgBox, { backgroundColor: colors.secondary }]}>
@@ -199,9 +189,7 @@ export default function ShopScreen() {
           )}
         </View>
         <View style={styles.rowInfo}>
-          {category ? (
-            <Text style={[styles.rowCategory, { color: colors.primary }]}>{category.toUpperCase()}</Text>
-          ) : null}
+          {category ? <Text style={[styles.rowCategory, { color: colors.primary }]}>{category.toUpperCase()}</Text> : null}
           <Text style={[styles.rowName, { color: colors.foreground }]} numberOfLines={2}>{item.name}</Text>
           <Text style={[styles.rowPrice, { color: colors.foreground }]}>{formatPrice(amt)}</Text>
         </View>
@@ -229,7 +217,6 @@ export default function ShopScreen() {
 
   const ListHeader = () => (
     <>
-      {/* Hero Banner */}
       <View style={[styles.heroBanner, { backgroundColor: colors.primary }]}>
         <View style={styles.heroText}>
           <Text style={styles.heroEyebrow}>NEW ARRIVALS</Text>
@@ -247,73 +234,43 @@ export default function ShopScreen() {
                 onPress={() => handleHeroCategoryTap(cat)}
                 activeOpacity={0.8}
               >
-                <Feather
-                  name={(HERO_ICONS[cat] ?? 'grid') as any}
-                  size={18}
-                  color={colors.primary}
-                />
-                <Text style={[styles.heroCatLabel, { color: colors.foreground }]} numberOfLines={1}>
-                  {cat}
-                </Text>
+                <Feather name={(HERO_ICONS[cat] ?? 'grid') as any} size={18} color={colors.primary} />
+                <Text style={[styles.heroCatLabel, { color: colors.foreground }]} numberOfLines={1}>{cat}</Text>
               </TouchableOpacity>
             ))}
           </View>
         )}
       </View>
 
-      {/* Featured Section */}
       {(isLoading || featured.length > 0) && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Featured</Text>
-            <TouchableOpacity onPress={() => handleCategoryFilter(undefined)}>
+            <TouchableOpacity onPress={() => setSelectedCategory(undefined)}>
               <Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.featuredRow}
-          >
-            {isLoading
-              ? [0, 1, 2].map((i) => <ProductSkeleton key={i} />)
-              : featured.map(renderFeaturedCard)}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.featuredRow}>
+            {isLoading ? [0, 1, 2].map((i) => <ProductSkeleton key={i} />) : featured.map(renderFeaturedCard)}
           </ScrollView>
         </View>
       )}
 
-      {/* All Products Header + Category Pills */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>All Products</Text>
         {categories.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.pills}
-          >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
             <TouchableOpacity
-              style={[
-                styles.pill,
-                {
-                  backgroundColor: selectedCategory === undefined ? colors.primary : colors.card,
-                  borderColor: colors.border,
-                },
-              ]}
-              onPress={() => handleCategoryFilter(undefined)}
+              style={[styles.pill, { backgroundColor: selectedCategory === undefined ? colors.primary : colors.card, borderColor: colors.border }]}
+              onPress={() => setSelectedCategory(undefined)}
             >
               <Text style={[styles.pillText, { color: selectedCategory === undefined ? '#fff' : colors.foreground }]}>All</Text>
             </TouchableOpacity>
             {categories.map((cat) => (
               <TouchableOpacity
                 key={cat}
-                style={[
-                  styles.pill,
-                  {
-                    backgroundColor: selectedCategory === cat ? colors.primary : colors.card,
-                    borderColor: colors.border,
-                  },
-                ]}
-                onPress={() => handleCategoryFilter(cat)}
+                style={[styles.pill, { backgroundColor: selectedCategory === cat ? colors.primary : colors.card, borderColor: colors.border }]}
+                onPress={() => setSelectedCategory(cat)}
               >
                 <Text style={[styles.pillText, { color: selectedCategory === cat ? '#fff' : colors.foreground }]}>{cat}</Text>
               </TouchableOpacity>
@@ -326,11 +283,10 @@ export default function ShopScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Top Header */}
       <View style={[styles.header, { paddingTop: topPadding + 16 }]}>
         <View>
-          <Text style={[styles.welcome, { color: colors.mutedForeground }]}>Welcome back</Text>
-          <Text style={[styles.brand, { color: colors.foreground }]}>{STORE_NAME}</Text>
+          <Text style={[styles.welcome, { color: colors.mutedForeground }]}>Welcome back,</Text>
+          <Text style={[styles.customerName, { color: colors.foreground }]}>{user.name}</Text>
         </View>
         <TouchableOpacity
           style={[styles.cartIconBtn, { backgroundColor: colors.card }]}
@@ -346,7 +302,6 @@ export default function ShopScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar */}
       <TouchableOpacity
         style={[styles.searchBar, { backgroundColor: colors.card }]}
         activeOpacity={0.85}
@@ -381,9 +336,7 @@ export default function ShopScreen() {
         }
         contentContainerStyle={{ paddingBottom: Platform.OS === 'web' ? 80 : 110 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       />
     </View>
   );
@@ -391,160 +344,46 @@ export default function ShopScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-  },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 12 },
   welcome: { fontSize: 13, fontFamily: 'Inter_400Regular' },
-  brand: { fontSize: 26, fontFamily: 'Inter_700Bold', letterSpacing: -0.5 },
-  cartIconBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cartBubble: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
+  customerName: { fontSize: 22, fontFamily: 'Inter_700Bold', letterSpacing: -0.3 },
+  cartIconBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  cartBubble: { position: 'absolute', top: 0, right: 0, minWidth: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
   cartBubbleText: { color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold' },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginBottom: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 10,
-  },
+  searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, gap: 10 },
   searchPlaceholder: { fontSize: 14, fontFamily: 'Inter_400Regular' },
-  heroBanner: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 18,
-    padding: 20,
-    flexDirection: 'row',
-    overflow: 'hidden',
-  },
+  heroBanner: { marginHorizontal: 16, marginBottom: 8, borderRadius: 18, padding: 20, flexDirection: 'row', overflow: 'hidden' },
   heroText: { flex: 1, justifyContent: 'center' },
   heroEyebrow: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontFamily: 'Inter_600SemiBold', letterSpacing: 1 },
   heroTitle: { color: '#fff', fontSize: 20, fontFamily: 'Inter_700Bold', marginVertical: 8, lineHeight: 26 },
-  heroBtn: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    alignSelf: 'flex-start',
-  },
+  heroBtn: { backgroundColor: '#fff', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, alignSelf: 'flex-start' },
   heroBtnText: { color: '#2563EB', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   heroCats: { width: 90, gap: 6, justifyContent: 'center' },
-  heroCatTile: {
-    borderRadius: 10,
-    padding: 8,
-    alignItems: 'center',
-    gap: 4,
-  },
+  heroCatTile: { borderRadius: 10, padding: 8, alignItems: 'center', gap: 4 },
   heroCatLabel: { fontSize: 10, fontFamily: 'Inter_500Medium', textAlign: 'center' },
   section: { paddingHorizontal: 16, marginTop: 20, marginBottom: 4 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   sectionTitle: { fontSize: 18, fontFamily: 'Inter_700Bold' },
   seeAll: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   featuredRow: { gap: 12, paddingRight: 4 },
-  featuredCard: {
-    width: 160,
-    borderRadius: 16,
-    padding: 10,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  featuredImgBox: {
-    height: 130,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
+  featuredCard: { width: 160, borderRadius: 16, padding: 10, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
+  featuredImgBox: { height: 130, borderRadius: 12, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', marginBottom: 8 },
   featuredImg: { width: '100%', height: '100%' },
-  badgeTag: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
+  badgeTag: { position: 'absolute', top: 8, left: 8, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   badgeTagText: { color: '#fff', fontSize: 11, fontFamily: 'Inter_700Bold' },
-  wishlistBtn: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    width: 28,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  wishlistBtn: { position: 'absolute', top: 8, right: 8, backgroundColor: '#fff', borderRadius: 12, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   cardCategory: { fontSize: 10, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.5, marginBottom: 3 },
   cardName: { fontSize: 13, fontFamily: 'Inter_500Medium', lineHeight: 18, marginBottom: 8 },
   cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardPrice: { fontSize: 15, fontFamily: 'Inter_700Bold' },
   addBtn: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   pills: { paddingVertical: 12, gap: 8 },
-  pill: {
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderWidth: 1,
-  },
+  pill: { borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, borderWidth: 1 },
   pillText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  productRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginBottom: 10,
-    borderRadius: 16,
-    padding: 12,
-    gap: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
-  },
-  rowImgBox: {
-    width: 70,
-    height: 70,
-    borderRadius: 12,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  productRow: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 10, borderRadius: 16, padding: 12, gap: 12, shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  rowImgBox: { width: 70, height: 70, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   rowImg: { width: '100%', height: '100%' },
-  smallBadge: {
-    position: 'absolute',
-    top: 4,
-    left: 4,
-    borderRadius: 6,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
+  smallBadge: { position: 'absolute', top: 4, left: 4, borderRadius: 6, paddingHorizontal: 5, paddingVertical: 2 },
   smallBadgeText: { color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold' },
   rowInfo: { flex: 1 },
   rowCategory: { fontSize: 10, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.5, marginBottom: 2 },
