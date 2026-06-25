@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   Image,
   Platform,
   RefreshControl,
+  Dimensions,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,9 +21,13 @@ import { useColors } from '@/hooks/useColors';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { useUser } from '@/context/UserContext';
+import { useAdmin } from '@/context/AdminContext';
 import { ProductSkeleton } from '@/components/SkeletonLoader';
 
 setBaseUrl(`https://${process.env.EXPO_PUBLIC_DOMAIN}`);
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const BANNER_WIDTH = SCREEN_WIDTH - 32;
 
 function formatPrice(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
@@ -35,6 +42,102 @@ const HERO_ICONS: Record<string, string> = {
   Beauty: 'star',
   Accessories: 'watch',
 };
+
+function HeroBannerSlider() {
+  const colors = useColors();
+  const { bannerSlides } = useAdmin();
+  const scrollRef = useRef<ScrollView>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const autoPlayRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startAutoPlay = useCallback(() => {
+    if (bannerSlides.length <= 1) return;
+    autoPlayRef.current = setInterval(() => {
+      setActiveIndex((prev) => {
+        const next = (prev + 1) % bannerSlides.length;
+        scrollRef.current?.scrollTo({ x: next * BANNER_WIDTH, animated: true });
+        return next;
+      });
+    }, 3500);
+  }, [bannerSlides.length]);
+
+  useEffect(() => {
+    startAutoPlay();
+    return () => { if (autoPlayRef.current) clearInterval(autoPlayRef.current); };
+  }, [startAutoPlay]);
+
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / BANNER_WIDTH);
+    setActiveIndex(idx);
+  };
+
+  const onTouchStart = () => {
+    if (autoPlayRef.current) clearInterval(autoPlayRef.current);
+  };
+
+  const onTouchEnd = () => {
+    startAutoPlay();
+  };
+
+  if (bannerSlides.length === 0) {
+    return (
+      <View style={[styles.bannerContainer, { backgroundColor: colors.primary }]}>
+        <View style={styles.bannerPlaceholder}>
+          <Feather name="image" size={32} color="rgba(255,255,255,0.5)" />
+          <Text style={styles.bannerPlaceholderText}>No banner slides</Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.bannerWrapper}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={onScroll}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        scrollEventThrottle={16}
+        style={styles.bannerScroll}
+        contentContainerStyle={{ width: BANNER_WIDTH * bannerSlides.length }}
+      >
+        {bannerSlides.map((slide) => (
+          <View key={slide.id} style={styles.bannerSlide}>
+            <Image
+              source={{ uri: slide.imageUri }}
+              style={styles.bannerImage}
+              resizeMode="cover"
+            />
+            <View style={styles.bannerOverlay}>
+              {slide.subtitle ? (
+                <Text style={styles.bannerEyebrow}>{slide.subtitle.toUpperCase()}</Text>
+              ) : null}
+              <Text style={styles.bannerTitle}>{slide.title}</Text>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+
+      {bannerSlides.length > 1 && (
+        <View style={styles.dotsRow}>
+          {bannerSlides.map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.dot,
+                { backgroundColor: i === activeIndex ? colors.primary : colors.border },
+                i === activeIndex && styles.dotActive,
+              ]}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
 
 export default function ShopScreen() {
   const colors = useColors();
@@ -102,11 +205,6 @@ export default function ShopScreen() {
     setTimeout(() => {
       flatListRef.current?.scrollToOffset({ offset: 380, animated: true });
     }, 80);
-  };
-
-  const handleShopNow = () => {
-    setSelectedCategory(undefined);
-    scrollToProducts();
   };
 
   const handleHeroCategoryTap = (cat: string) => {
@@ -213,34 +311,40 @@ export default function ShopScreen() {
     );
   };
 
-  const heroCats = categories.slice(0, 3);
+  const heroCats = categories.slice(0, 4);
 
   const ListHeader = () => (
     <>
-      <View style={[styles.heroBanner, { backgroundColor: colors.primary }]}>
-        <View style={styles.heroText}>
-          <Text style={styles.heroEyebrow}>NEW ARRIVALS</Text>
-          <Text style={styles.heroTitle}>Summer Collection 2026</Text>
-          <TouchableOpacity style={styles.heroBtn} onPress={handleShopNow} activeOpacity={0.85}>
-            <Text style={styles.heroBtnText}>Shop Now</Text>
-          </TouchableOpacity>
-        </View>
-        {heroCats.length > 0 && (
-          <View style={styles.heroCats}>
-            {heroCats.map((cat, i) => (
-              <TouchableOpacity
-                key={cat}
-                style={[styles.heroCatTile, { backgroundColor: i === 0 ? '#E8EDF8' : '#DDE3F0' }]}
-                onPress={() => handleHeroCategoryTap(cat)}
-                activeOpacity={0.8}
-              >
-                <Feather name={(HERO_ICONS[cat] ?? 'grid') as any} size={18} color={colors.primary} />
-                <Text style={[styles.heroCatLabel, { color: colors.foreground }]} numberOfLines={1}>{cat}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-      </View>
+      <HeroBannerSlider />
+
+      {heroCats.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.catRow}
+        >
+          {heroCats.map((cat, i) => (
+            <TouchableOpacity
+              key={cat}
+              style={[styles.catChip, {
+                backgroundColor: selectedCategory === cat ? colors.primary : colors.card,
+                borderColor: colors.border,
+              }]}
+              onPress={() => handleHeroCategoryTap(cat)}
+              activeOpacity={0.8}
+            >
+              <Feather
+                name={(HERO_ICONS[cat] ?? 'grid') as any}
+                size={16}
+                color={selectedCategory === cat ? '#fff' : colors.primary}
+              />
+              <Text style={[styles.catChipLabel, { color: selectedCategory === cat ? '#fff' : colors.foreground }]}>
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       {(isLoading || featured.length > 0) && (
         <View style={styles.section}>
@@ -352,16 +456,26 @@ const styles = StyleSheet.create({
   cartBubbleText: { color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold' },
   searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, gap: 10 },
   searchPlaceholder: { fontSize: 14, fontFamily: 'Inter_400Regular' },
-  heroBanner: { marginHorizontal: 16, marginBottom: 8, borderRadius: 18, padding: 20, flexDirection: 'row', overflow: 'hidden' },
-  heroText: { flex: 1, justifyContent: 'center' },
-  heroEyebrow: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontFamily: 'Inter_600SemiBold', letterSpacing: 1 },
-  heroTitle: { color: '#fff', fontSize: 20, fontFamily: 'Inter_700Bold', marginVertical: 8, lineHeight: 26 },
-  heroBtn: { backgroundColor: '#fff', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8, alignSelf: 'flex-start' },
-  heroBtnText: { color: '#2563EB', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  heroCats: { width: 90, gap: 6, justifyContent: 'center' },
-  heroCatTile: { borderRadius: 10, padding: 8, alignItems: 'center', gap: 4 },
-  heroCatLabel: { fontSize: 10, fontFamily: 'Inter_500Medium', textAlign: 'center' },
-  section: { paddingHorizontal: 16, marginTop: 20, marginBottom: 4 },
+
+  bannerWrapper: { marginHorizontal: 16, marginBottom: 14 },
+  bannerScroll: { borderRadius: 18, overflow: 'hidden' },
+  bannerContainer: { height: 180, borderRadius: 18, marginHorizontal: 16, marginBottom: 14, alignItems: 'center', justifyContent: 'center' },
+  bannerSlide: { width: BANNER_WIDTH, height: 180, borderRadius: 18, overflow: 'hidden' },
+  bannerImage: { width: '100%', height: '100%' },
+  bannerOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, paddingBottom: 18, backgroundColor: 'rgba(0,0,0,0.35)' },
+  bannerEyebrow: { color: 'rgba(255,255,255,0.8)', fontSize: 10, fontFamily: 'Inter_600SemiBold', letterSpacing: 1.2, marginBottom: 3 },
+  bannerTitle: { color: '#fff', fontSize: 20, fontFamily: 'Inter_700Bold', lineHeight: 26 },
+  bannerPlaceholder: { alignItems: 'center', gap: 8 },
+  bannerPlaceholderText: { color: 'rgba(255,255,255,0.6)', fontSize: 13, fontFamily: 'Inter_400Regular' },
+  dotsRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  dotActive: { width: 18 },
+
+  catRow: { paddingHorizontal: 16, paddingBottom: 14, gap: 10 },
+  catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  catChipLabel: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+
+  section: { paddingHorizontal: 16, marginTop: 4, marginBottom: 4 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   sectionTitle: { fontSize: 18, fontFamily: 'Inter_700Bold' },
   seeAll: { fontSize: 13, fontFamily: 'Inter_500Medium' },
