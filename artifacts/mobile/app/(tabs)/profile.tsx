@@ -18,6 +18,7 @@ import { useColors } from '@/hooks/useColors';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
 import { useUser, Language } from '@/context/UserContext';
+import { useAdmin } from '@/context/AdminContext';
 
 const LANGUAGES: Language[] = ['English', 'Telugu', 'Hindi'];
 
@@ -492,6 +493,7 @@ export default function ProfileScreen() {
   const { totalItems: cartItems, clearCart } = useCart();
   const { totalItems: wishlistItems } = useWishlist();
   const { user, toggleNotifications } = useUser();
+  const { isAdmin } = useAdmin();
 
   const topPadding = Platform.OS === 'web' ? 24 : insets.top;
 
@@ -519,11 +521,11 @@ export default function ProfileScreen() {
   };
 
   const handleAdminPanel = () => {
-    Alert.alert(
-      'Admin Panel',
-      'Manage your store:\n\n• Products: Via Stripe Dashboard\n• Orders: View in Orders tab\n• Webhooks: Stripe Dashboard',
-      [{ text: 'View Orders', onPress: () => router.push('/(tabs)/orders') }, { text: 'Close', style: 'cancel' }]
-    );
+    if (isAdmin) {
+      router.push('/admin/dashboard');
+    } else {
+      router.push('/admin/login');
+    }
   };
 
   return (

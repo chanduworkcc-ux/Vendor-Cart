@@ -18,6 +18,7 @@ import { LoadingScreen } from "@/components/LoadingScreen";
 import { CartProvider } from "@/context/CartContext";
 import { WishlistProvider } from "@/context/WishlistContext";
 import { UserProvider } from "@/context/UserContext";
+import { AdminProvider } from "@/context/AdminContext";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -28,6 +29,14 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="admin/login" options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="admin/dashboard" options={{ headerShown: false }} />
+      <Stack.Screen name="admin/products" options={{ headerShown: false }} />
+      <Stack.Screen name="admin/orders" options={{ headerShown: false }} />
+      <Stack.Screen name="admin/customers" options={{ headerShown: false }} />
+      <Stack.Screen name="admin/analytics" options={{ headerShown: false }} />
+      <Stack.Screen name="admin/discounts" options={{ headerShown: false }} />
+      <Stack.Screen name="admin/settings" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -63,17 +72,19 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <UserProvider>
-            <CartProvider>
-              <WishlistProvider>
-                <GestureHandlerRootView>
-                  <KeyboardProvider>
-                    <RootLayoutNav />
-                  </KeyboardProvider>
-                </GestureHandlerRootView>
-              </WishlistProvider>
-            </CartProvider>
-          </UserProvider>
+          <AdminProvider>
+            <UserProvider>
+              <CartProvider>
+                <WishlistProvider>
+                  <GestureHandlerRootView>
+                    <KeyboardProvider>
+                      <RootLayoutNav />
+                    </KeyboardProvider>
+                  </GestureHandlerRootView>
+                </WishlistProvider>
+              </CartProvider>
+            </UserProvider>
+          </AdminProvider>
         </QueryClientProvider>
       </ErrorBoundary>
     </SafeAreaProvider>
