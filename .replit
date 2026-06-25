@@ -11,6 +11,59 @@ env = { "CI" = "true" }
 [workflows]
 runButton = "Project"
 
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "API Server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Admin App"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "User App"
+
+[[workflows.workflow]]
+name = "API Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=3000 cd artifacts/api-server && PORT=3000 pnpm run dev"
+waitForPort = 3000
+
+[[workflows.workflow]]
+name = "Admin App"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=5174 BASE_PATH=/admin-app/ cd artifacts/admin-app && PORT=5174 BASE_PATH=/admin-app/ pnpm run dev"
+waitForPort = 5174
+
+[[workflows.workflow]]
+name = "User App"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=5173 BASE_PATH=/user-app/ cd artifacts/user-app && PORT=5173 BASE_PATH=/user-app/ pnpm run dev"
+waitForPort = 5173
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true

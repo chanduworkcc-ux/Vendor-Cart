@@ -8,14 +8,17 @@ import { getOnlineUserIds } from "../lib/websocket";
 
 const router = Router();
 
-// Update profile (name, language, theme)
+// Update profile (name, language, theme, phone, address, upiId)
 router.patch("/profile", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const { name, language, theme } = req.body;
+    const { name, language, theme, phone, address, upiId } = req.body;
     const updates: any = { updatedAt: new Date() };
-    if (name) updates.name = name;
-    if (language) updates.language = language;
-    if (theme) updates.theme = theme;
+    if (name !== undefined) updates.name = name;
+    if (language !== undefined) updates.language = language;
+    if (theme !== undefined) updates.theme = theme;
+    if (phone !== undefined) updates.phone = phone || null;
+    if (address !== undefined) updates.address = address || null;
+    if (upiId !== undefined) updates.upiId = upiId || null;
 
     const [updated] = await db.update(usersTable).set(updates).where(eq(usersTable.id, req.userId!)).returning();
     res.json(formatUser(updated));
@@ -41,11 +44,20 @@ router.patch("/profile/password", requireAuth, async (req: AuthRequest, res) => 
 router.get("/admin/online-users", requireAdmin, async (_req, res) => {
   try {
     const onlineIds = getOnlineUserIds();
-    const users = await db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email, role: usersTable.role, lastSeen: usersTable.lastSeen })
-      .from(usersTable);
+    const users = await db.select({
+      id: usersTable.id, name: usersTable.name, email: usersTable.email,
+      role: usersTable.role, status: usersTable.status, lastSeen: usersTable.lastSeen,
+      coinBalance: usersTable.coinBalance, referralCode: usersTable.referralCode,
+      createdAt: usersTable.createdAt,
+    }).from(usersTable);
     res.json({
       onlineCount: onlineIds.length,
-      users: users.map(u => ({ ...u, isOnline: onlineIds.includes(u.id), lastSeen: u.lastSeen?.toISOString() ?? null })),
+      users: users.map(u => ({
+        ...u,
+        isOnline: onlineIds.includes(u.id),
+        lastSeen: u.lastSeen?.toISOString() ?? null,
+        createdAt: u.createdAt.toISOString(),
+      })),
     });
   } catch { res.status(500).json({ error: "Failed to get online users" }); }
 });
@@ -58,7 +70,7 @@ router.get("/admin/activity-logs", requireAdmin, async (req: AuthRequest, res) =
       .from(activityLogsTable).leftJoin(usersTable, eq(activityLogsTable.userId, usersTable.id))
       .orderBy(desc(activityLogsTable.createdAt)).limit(200);
     if (userId) logs = logs.filter(l => l.log.userId === parseInt(userId));
-    res.json({ data: logs.map(l => ({ id: l.log.id, userId: l.log.userId, userName: l.userName, action: l.log.action, details: l.log.details, createdAt: l.log.createdAt.toISOString() })) });
+    res.json({ data: logs.map(l => ({ id: l.log.id, userId: l.log.userId, userName: l.userName, action: l.log.action, details: l.log.details, ipAddress: l.log.ipAddress, createdAt: l.log.createdAt.toISOString() })) });
   } catch { res.status(500).json({ error: "Failed to get activity logs" }); }
 });
 
@@ -68,6 +80,8 @@ function formatUser(user: typeof usersTable.$inferSelect) {
     status: user.status, emailVerified: user.emailVerified,
     language: user.language, theme: user.theme,
     isOnline: user.isOnline, lastSeen: user.lastSeen?.toISOString() ?? null,
+    phone: user.phone, address: user.address, upiId: user.upiId,
+    coinBalance: user.coinBalance, referralCode: user.referralCode,
     createdAt: user.createdAt.toISOString(),
   };
 }

@@ -18,6 +18,10 @@ import Notifications from "@/pages/notifications";
 import Settings from "@/pages/settings";
 import Tickets from "@/pages/tickets";
 import TicketDetail from "@/pages/ticket-detail";
+import Analytics from "@/pages/analytics";
+import ActivityLogs from "@/pages/activity-logs";
+import Referrals from "@/pages/referrals";
+import Withdrawals from "@/pages/withdrawals";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -81,6 +85,30 @@ function Router() {
       <Route path="/tickets/:id">
         <ProtectedRoute>
           <Layout><TicketDetail /></Layout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/analytics">
+        <ProtectedRoute>
+          <Layout><Analytics /></Layout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/activity-logs">
+        <ProtectedRoute>
+          <Layout><ActivityLogs /></Layout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/referrals">
+        <ProtectedRoute>
+          <Layout><Referrals /></Layout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/withdrawals">
+        <ProtectedRoute>
+          <Layout><Withdrawals /></Layout>
         </ProtectedRoute>
       </Route>
 

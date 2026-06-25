@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { ordersTable, usersTable, notificationsTable, adminSettingsTable } from "@workspace/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { requireAuth, requireAdmin, type AuthRequest } from "../lib/middleware";
 import { broadcastToUser, broadcastToAdmins } from "../lib/websocket";
 
@@ -35,16 +35,38 @@ router.get("/orders", requireAuth, async (req: AuthRequest, res) => {
 
 router.post("/orders", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const settings = await db.select().from(adminSettingsTable).limit(1);
-    if (settings.length > 0 && !settings[0].acceptingOrders) {
+    const settings = await getSettings();
+    if (!settings.acceptingOrders) {
       res.status(400).json({ error: "Orders are not being accepted at this time" });
       return;
     }
 
-    const { title, description, quantity, totalAmount, notes } = req.body;
-    if (!title || !quantity) {
-      res.status(400).json({ error: "Title and quantity are required" }); return;
+    const { title, description, notes } = req.body;
+    if (!title) {
+      res.status(400).json({ error: "Title is required" }); return;
     }
+
+    // Enforce: one order per cooldown period
+    const cooldownMs = settings.orderCooldownMinutes * 60 * 1000;
+    const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1);
+    if (currentUser?.lastOrderAt) {
+      const timeSinceLast = Date.now() - new Date(currentUser.lastOrderAt).getTime();
+      if (timeSinceLast < cooldownMs) {
+        const remainingMin = Math.ceil((cooldownMs - timeSinceLast) / 60000);
+        res.status(400).json({ error: `You can place another order in ${remainingMin} minute(s). One order per ${settings.orderCooldownMinutes} minutes.` });
+        return;
+      }
+    }
+
+    // Enforce: only one active (non-delivered, non-cancelled) order at a time
+    const activeOrders = await db.select().from(ordersTable)
+      .where(eq(ordersTable.userId, req.userId!));
+    const hasActive = activeOrders.some(o => o.status !== "delivered" && o.status !== "cancelled");
+    if (hasActive) {
+      res.status(400).json({ error: "You already have an active order. You can place a new order after your current one is completed." });
+      return;
+    }
+
     // Generate orderRef: 2026-XXXX
     const year = new Date().getFullYear();
     const existingCount = await db.select().from(ordersTable);
@@ -56,17 +78,16 @@ router.post("/orders", requireAuth, async (req: AuthRequest, res) => {
       userId: req.userId!,
       title,
       description: description || null,
-      quantity: parseInt(quantity),
-      totalAmount: totalAmount ? totalAmount.toString() : null,
+      quantity: 1,
+      totalAmount: null,
       status: "pending",
       notes: notes || null,
     }).returning();
 
-    broadcastToAdmins("new_order", {
-      orderId: order.id,
-      userId: req.userId,
-      title: order.title,
-    });
+    // Update lastOrderAt
+    await db.update(usersTable).set({ lastOrderAt: new Date(), updatedAt: new Date() }).where(eq(usersTable.id, req.userId!));
+
+    broadcastToAdmins("new_order", { orderId: order.id, userId: req.userId, title: order.title });
 
     const [user] = await db.select({ name: usersTable.name, email: usersTable.email })
       .from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1);
@@ -113,26 +134,17 @@ router.patch("/orders/:orderId/status", requireAdmin, async (req: AuthRequest, r
     if (!updated) { res.status(404).json({ error: "Order not found" }); return; }
 
     const statusLabels: Record<string, string> = {
-      pending: "Pending",
-      processing: "Processing",
-      shipped: "Shipped",
-      delivered: "Delivered",
-      cancelled: "Cancelled",
+      pending: "Pending", processing: "Processing", shipped: "Shipped", delivered: "Delivered", cancelled: "Cancelled",
     };
 
     await db.insert(notificationsTable).values({
       userId: updated.userId,
-      title: `Order #${orderId} Status Updated`,
+      title: `Order ${updated.orderRef ?? `#${orderId}`} Status Updated`,
       message: `Your order "${updated.title}" is now ${statusLabels[status]}.${notes ? ` Note: ${notes}` : ""}`,
-      type: "order_update",
-      isRead: false,
+      type: "order_update", isRead: false,
     });
 
-    broadcastToUser(updated.userId, "order_status_changed", {
-      orderId,
-      status,
-      title: updated.title,
-    });
+    broadcastToUser(updated.userId, "order_status_changed", { orderId, status, title: updated.title });
 
     const [userInfo] = await db.select({ name: usersTable.name, email: usersTable.email })
       .from(usersTable).where(eq(usersTable.id, updated.userId)).limit(1);
@@ -152,32 +164,19 @@ router.patch("/orders/:orderId/shipping", requireAdmin, async (req: AuthRequest,
     }
 
     const [updated] = await db.update(ordersTable)
-      .set({
-        shippingPartner,
-        deliveryDate,
-        trackingLink,
-        status: "shipped",
-        notes: notes || null,
-        updatedAt: new Date(),
-      })
+      .set({ shippingPartner, deliveryDate, trackingLink, status: "shipped", notes: notes || null, updatedAt: new Date() })
       .where(eq(ordersTable.id, orderId))
       .returning();
     if (!updated) { res.status(404).json({ error: "Order not found" }); return; }
 
     await db.insert(notificationsTable).values({
       userId: updated.userId,
-      title: `Order #${orderId} Has Been Shipped!`,
-      message: `Your order "${updated.title}" has been shipped via ${shippingPartner}. Expected delivery: ${deliveryDate}. Track your order: ${trackingLink}`,
-      type: "order_update",
-      isRead: false,
+      title: `Order ${updated.orderRef ?? `#${orderId}`} Has Been Shipped!`,
+      message: `Your order "${updated.title}" has been shipped via ${shippingPartner}. Expected delivery: ${deliveryDate}. Track: ${trackingLink}`,
+      type: "order_update", isRead: false,
     });
 
-    broadcastToUser(updated.userId, "order_shipped", {
-      orderId,
-      shippingPartner,
-      deliveryDate,
-      trackingLink,
-    });
+    broadcastToUser(updated.userId, "order_shipped", { orderId, shippingPartner, deliveryDate, trackingLink });
 
     const [userInfo] = await db.select({ name: usersTable.name, email: usersTable.email })
       .from(usersTable).where(eq(usersTable.id, updated.userId)).limit(1);
@@ -188,11 +187,14 @@ router.patch("/orders/:orderId/shipping", requireAdmin, async (req: AuthRequest,
   }
 });
 
-function formatOrder(
-  order: typeof ordersTable.$inferSelect,
-  userName?: string | null,
-  userEmail?: string | null,
-) {
+async function getSettings() {
+  const existing = await db.select().from(adminSettingsTable).limit(1);
+  if (existing.length > 0) return existing[0];
+  const [created] = await db.insert(adminSettingsTable).values({}).returning();
+  return created;
+}
+
+function formatOrder(order: typeof ordersTable.$inferSelect, userName?: string | null, userEmail?: string | null) {
   return {
     id: order.id,
     orderRef: order.orderRef ?? `${new Date().getFullYear()}-${String(order.id).padStart(4, "0")}`,

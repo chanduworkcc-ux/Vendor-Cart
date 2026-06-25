@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, timestamp, integer, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -18,6 +18,14 @@ export const usersTable = pgTable("users", {
   theme: text("theme").notNull().default("light"),
   isOnline: boolean("is_online").notNull().default(false),
   lastSeen: timestamp("last_seen"),
+  phone: text("phone"),
+  address: text("address"),
+  upiId: text("upi_id"),
+  coinBalance: integer("coin_balance").notNull().default(0),
+  referralCode: text("referral_code").unique(),
+  referredBy: integer("referred_by"),
+  deviceId: text("device_id"),
+  lastOrderAt: timestamp("last_order_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

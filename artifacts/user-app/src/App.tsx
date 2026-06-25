@@ -19,6 +19,7 @@ import Notifications from "@/pages/notifications";
 import Profile from "@/pages/profile";
 import Tickets from "@/pages/tickets";
 import TicketDetail from "@/pages/ticket-detail";
+import Referral from "@/pages/referral";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -94,6 +95,14 @@ function Router() {
         <ProtectedRoute>
           <Layout>
             <TicketDetail />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/referral">
+        <ProtectedRoute>
+          <Layout>
+            <Referral />
           </Layout>
         </ProtectedRoute>
       </Route>

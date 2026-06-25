@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useListNotifications } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
-import { Package, LayoutDashboard, Bell, LogOut, Menu, User, MessageSquare } from "lucide-react";
+import { Package, LayoutDashboard, Bell, LogOut, Menu, User, MessageSquare, Gift, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
@@ -26,14 +26,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
       return res.json();
     },
     enabled: !!user && (user as any).status === "approved",
+    refetchInterval: 30000,
   });
 
   const unreadCount = notificationsData?.unreadCount || 0;
   const openTickets = (ticketsData?.data || []).filter((t: any) => t.status === "open" || t.status === "in_progress").length;
+  const coinBalance = (user as any)?.coinBalance ?? 0;
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/orders", label: "Orders", icon: Package },
+    { href: "/orders", label: "My Orders", icon: Package },
+    { href: "/referral", label: "Referral & Coins", icon: Gift },
     { href: "/tickets", label: "Support", icon: MessageSquare, badge: openTickets },
     { href: "/notifications", label: "Notifications", icon: Bell, badge: unreadCount },
     { href: "/profile", label: "Profile", icon: User },
@@ -67,6 +70,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         })}
       </div>
       <div className="mt-auto border-t pt-4 space-y-2">
+        {coinBalance > 0 && (
+          <div className="px-4 py-2 rounded-lg bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800">
+            <div className="flex items-center gap-1.5">
+              <span className="text-yellow-600 text-sm font-bold">🪙 {coinBalance} Coins</span>
+            </div>
+          </div>
+        )}
         <div className="px-4 py-2 rounded-lg bg-muted/50">
           <p className="text-xs text-muted-foreground">Welcome back,</p>
           <p className="text-sm font-semibold text-foreground truncate">{user?.name}</p>
@@ -112,6 +122,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <span className="font-semibold text-foreground">{user?.name}</span>
           </div>
           <div className="flex items-center gap-2">
+            {coinBalance > 0 && (
+              <Link href="/referral">
+                <Button variant="outline" size="sm" className="hidden sm:flex items-center gap-1 text-yellow-600 border-yellow-300 hover:bg-yellow-50 text-xs font-bold">
+                  🪙 {coinBalance}
+                </Button>
+              </Link>
+            )}
             {unreadCount > 0 && (
               <Link href="/notifications">
                 <Button variant="ghost" size="icon" className="relative">

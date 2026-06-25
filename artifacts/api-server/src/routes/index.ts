@@ -7,6 +7,8 @@ import notificationsRouter from "./notifications";
 import adminRouter from "./admin";
 import ticketsRouter from "./tickets";
 import profileRouter from "./profile";
+import referralsRouter from "./referrals";
+import withdrawalsRouter from "./withdrawals";
 
 const router: IRouter = Router();
 
@@ -18,5 +20,7 @@ router.use(notificationsRouter);
 router.use(adminRouter);
 router.use(ticketsRouter);
 router.use(profileRouter);
+router.use(referralsRouter);
+router.use(withdrawalsRouter);
 
 export default router;
