@@ -26,6 +26,11 @@ export const usersTable = pgTable("users", {
   referredBy: integer("referred_by"),
   deviceId: text("device_id"),
   lastOrderAt: timestamp("last_order_at"),
+  loginAttempts: integer("login_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until"),
+  lastLoginIp: text("last_login_ip"),
+  lastLoginAt: timestamp("last_login_at"),
+  registrationIp: text("registration_ip"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

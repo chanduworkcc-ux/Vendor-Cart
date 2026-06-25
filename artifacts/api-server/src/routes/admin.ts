@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable, ordersTable, notificationsTable, adminSettingsTable, ticketsTable, referralsTable, withdrawalRequestsTable } from "@workspace/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { usersTable, ordersTable, notificationsTable, adminSettingsTable, ticketsTable, referralsTable, withdrawalRequestsTable, activityLogsTable, blockedIpsTable } from "@workspace/db/schema";
+import { eq, desc, and, gt, lt, or, like, inArray } from "drizzle-orm";
 import { requireAdmin, type AuthRequest } from "../lib/middleware";
 import { broadcastToAll, getOnlineUserIds } from "../lib/websocket";
 
@@ -24,38 +24,40 @@ router.get("/admin/settings", requireAdmin, async (_req, res) => {
       coinsPerReferral: settings.coinsPerReferral,
       minWithdrawalCoins: settings.minWithdrawalCoins,
       coinsPerRupee: settings.coinsPerRupee,
+      referralEnabled: settings.referralEnabled,
+      maxLoginAttempts: settings.maxLoginAttempts,
+      lockDurationMinutes: settings.lockDurationMinutes,
       updatedAt: settings.updatedAt.toISOString(),
     });
-  } catch {
-    res.status(500).json({ error: "Failed to get settings" });
-  }
+  } catch { res.status(500).json({ error: "Failed to get settings" }); }
 });
 
 router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const settings = await getOrCreateSettings();
-    const { acceptingOrders, maintenanceMode, orderCooldownMinutes, coinsPerReferral, minWithdrawalCoins, coinsPerRupee } = req.body;
+    const {
+      acceptingOrders, maintenanceMode, orderCooldownMinutes,
+      coinsPerReferral, minWithdrawalCoins, coinsPerRupee,
+      referralEnabled, maxLoginAttempts, lockDurationMinutes,
+    } = req.body;
 
-    const [updated] = await db.update(adminSettingsTable)
-      .set({
-        acceptingOrders: acceptingOrders !== undefined ? acceptingOrders : settings.acceptingOrders,
-        maintenanceMode: maintenanceMode !== undefined ? maintenanceMode : settings.maintenanceMode,
-        orderCooldownMinutes: orderCooldownMinutes !== undefined ? parseInt(orderCooldownMinutes) : settings.orderCooldownMinutes,
-        coinsPerReferral: coinsPerReferral !== undefined ? parseInt(coinsPerReferral) : settings.coinsPerReferral,
-        minWithdrawalCoins: minWithdrawalCoins !== undefined ? parseInt(minWithdrawalCoins) : settings.minWithdrawalCoins,
-        coinsPerRupee: coinsPerRupee !== undefined ? parseInt(coinsPerRupee) : settings.coinsPerRupee,
-        updatedAt: new Date(),
-      })
-      .where(eq(adminSettingsTable.id, settings.id))
-      .returning();
+    const [updated] = await db.update(adminSettingsTable).set({
+      acceptingOrders: acceptingOrders !== undefined ? acceptingOrders : settings.acceptingOrders,
+      maintenanceMode: maintenanceMode !== undefined ? maintenanceMode : settings.maintenanceMode,
+      orderCooldownMinutes: orderCooldownMinutes !== undefined ? parseInt(orderCooldownMinutes) : settings.orderCooldownMinutes,
+      coinsPerReferral: coinsPerReferral !== undefined ? parseInt(coinsPerReferral) : settings.coinsPerReferral,
+      minWithdrawalCoins: minWithdrawalCoins !== undefined ? parseInt(minWithdrawalCoins) : settings.minWithdrawalCoins,
+      coinsPerRupee: coinsPerRupee !== undefined ? parseInt(coinsPerRupee) : settings.coinsPerRupee,
+      referralEnabled: referralEnabled !== undefined ? referralEnabled : settings.referralEnabled,
+      maxLoginAttempts: maxLoginAttempts !== undefined ? parseInt(maxLoginAttempts) : settings.maxLoginAttempts,
+      lockDurationMinutes: lockDurationMinutes !== undefined ? parseInt(lockDurationMinutes) : settings.lockDurationMinutes,
+      updatedAt: new Date(),
+    }).where(eq(adminSettingsTable.id, settings.id)).returning();
 
     broadcastToAll("settings_changed", {
       acceptingOrders: updated.acceptingOrders,
       maintenanceMode: updated.maintenanceMode,
-      orderCooldownMinutes: updated.orderCooldownMinutes,
-      coinsPerReferral: updated.coinsPerReferral,
-      minWithdrawalCoins: updated.minWithdrawalCoins,
-      coinsPerRupee: updated.coinsPerRupee,
+      referralEnabled: updated.referralEnabled,
     });
 
     res.json({
@@ -65,11 +67,12 @@ router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
       coinsPerReferral: updated.coinsPerReferral,
       minWithdrawalCoins: updated.minWithdrawalCoins,
       coinsPerRupee: updated.coinsPerRupee,
+      referralEnabled: updated.referralEnabled,
+      maxLoginAttempts: updated.maxLoginAttempts,
+      lockDurationMinutes: updated.lockDurationMinutes,
       updatedAt: updated.updatedAt.toISOString(),
     });
-  } catch {
-    res.status(500).json({ error: "Failed to update settings" });
-  }
+  } catch { res.status(500).json({ error: "Failed to update settings" }); }
 });
 
 router.get("/admin/stats", requireAdmin, async (_req, res) => {
@@ -80,6 +83,7 @@ router.get("/admin/stats", requireAdmin, async (_req, res) => {
     const tickets = await db.select().from(ticketsTable);
     const referrals = await db.select().from(referralsTable);
     const withdrawals = await db.select().from(withdrawalRequestsTable);
+    const blocked = await db.select().from(blockedIpsTable);
     const onlineIds = getOnlineUserIds();
 
     res.json({
@@ -100,13 +104,11 @@ router.get("/admin/stats", requireAdmin, async (_req, res) => {
       totalReferrals: referrals.length,
       pendingWithdrawals: withdrawals.filter(w => w.status === "created").length,
       totalWithdrawals: withdrawals.length,
+      blockedIps: blocked.length,
     });
-  } catch {
-    res.status(500).json({ error: "Failed to get stats" });
-  }
+  } catch { res.status(500).json({ error: "Failed to get stats" }); }
 });
 
-// Real-time analytics: orders per day (last 7 days)
 router.get("/admin/analytics", requireAdmin, async (_req, res) => {
   try {
     const orders = await db.select().from(ordersTable).orderBy(desc(ordersTable.createdAt));
@@ -114,7 +116,6 @@ router.get("/admin/analytics", requireAdmin, async (_req, res) => {
     const referrals = await db.select().from(referralsTable).orderBy(desc(referralsTable.createdAt));
     const withdrawals = await db.select().from(withdrawalRequestsTable).orderBy(desc(withdrawalRequestsTable.createdAt));
 
-    // Last 7 days
     const now = new Date();
     const days = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(now);
@@ -144,9 +145,129 @@ router.get("/admin/analytics", requireAdmin, async (_req, res) => {
       recentOrders: orders.slice(0, 10).map(o => ({ id: o.id, orderRef: o.orderRef, status: o.status, createdAt: o.createdAt.toISOString() })),
       recentUsers: users.slice(0, 10).map(u => ({ id: u.id, name: u.name, status: u.status, createdAt: u.createdAt.toISOString() })),
     });
-  } catch {
-    res.status(500).json({ error: "Failed to get analytics" });
-  }
+  } catch { res.status(500).json({ error: "Failed to get analytics" }); }
+});
+
+// ─── SECURITY ENDPOINTS ────────────────────────────────────────────────────
+
+// List all blocked IPs
+router.get("/admin/security/blocked-ips", requireAdmin, async (_req, res) => {
+  try {
+    const blocked = await db.select().from(blockedIpsTable).orderBy(desc(blockedIpsTable.createdAt));
+    res.json({ data: blocked.map(b => ({ ...b, createdAt: b.createdAt.toISOString(), expiresAt: b.expiresAt?.toISOString() ?? null })) });
+  } catch { res.status(500).json({ error: "Failed to get blocked IPs" }); }
+});
+
+// Block an IP
+router.post("/admin/security/block-ip", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { ipAddress, reason, permanent, durationHours } = req.body;
+    if (!ipAddress) { res.status(400).json({ error: "IP address required" }); return; }
+
+    const expiresAt = permanent ? null : new Date(Date.now() + (durationHours || 24) * 3600 * 1000);
+
+    // Upsert
+    const existing = await db.select().from(blockedIpsTable).where(eq(blockedIpsTable.ipAddress, ipAddress)).limit(1);
+    if (existing.length > 0) {
+      await db.update(blockedIpsTable).set({ reason: reason || "Manual block", permanent: !!permanent, expiresAt, blockedBy: req.userId }).where(eq(blockedIpsTable.ipAddress, ipAddress));
+    } else {
+      await db.insert(blockedIpsTable).values({ ipAddress, reason: reason || "Manual block", permanent: !!permanent, expiresAt, blockedBy: req.userId });
+    }
+
+    await db.insert(activityLogsTable).values({ userId: req.userId, action: "ip_blocked", details: `Blocked IP ${ipAddress}: ${reason}`, ipAddress: req.socket?.remoteAddress || "admin" });
+    res.json({ success: true, message: `IP ${ipAddress} blocked ${permanent ? "permanently" : `for ${durationHours || 24}h`}` });
+  } catch { res.status(500).json({ error: "Failed to block IP" }); }
+});
+
+// Unblock an IP
+router.delete("/admin/security/block-ip/:id", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [b] = await db.select().from(blockedIpsTable).where(eq(blockedIpsTable.id, id)).limit(1);
+    if (!b) { res.status(404).json({ error: "Not found" }); return; }
+    await db.delete(blockedIpsTable).where(eq(blockedIpsTable.id, id));
+    await db.insert(activityLogsTable).values({ userId: req.userId, action: "ip_unblocked", details: `Unblocked IP ${b.ipAddress}`, ipAddress: "admin" });
+    res.json({ success: true });
+  } catch { res.status(500).json({ error: "Failed to unblock IP" }); }
+});
+
+// Security overview: unique IPs, suspicious activity, locked accounts
+router.get("/admin/security/overview", requireAdmin, async (_req, res) => {
+  try {
+    const recentLogs = await db.select({ log: activityLogsTable, userName: usersTable.name })
+      .from(activityLogsTable)
+      .leftJoin(usersTable, eq(activityLogsTable.userId, usersTable.id))
+      .orderBy(desc(activityLogsTable.createdAt))
+      .limit(500);
+
+    const blocked = await db.select().from(blockedIpsTable);
+    const lockedUsers = await db.select({ id: usersTable.id, name: usersTable.name, email: usersTable.email, loginAttempts: usersTable.loginAttempts, lockedUntil: usersTable.lockedUntil })
+      .from(usersTable)
+      .where(gt(usersTable.loginAttempts, 0));
+
+    // Unique IPs from logs
+    const ipCounts = new Map<string, number>();
+    const ipActions = new Map<string, string[]>();
+    for (const { log } of recentLogs) {
+      if (log.ipAddress) {
+        ipCounts.set(log.ipAddress, (ipCounts.get(log.ipAddress) || 0) + 1);
+        const acts = ipActions.get(log.ipAddress) || [];
+        acts.push(log.action);
+        ipActions.set(log.ipAddress, acts);
+      }
+    }
+
+    // Failed login attempts by IP
+    const failedLogins = recentLogs.filter(({ log }) => log.action === "login_failed" || log.action === "login_account_locked");
+    const failedByIp = new Map<string, number>();
+    for (const { log } of failedLogins) {
+      if (log.ipAddress) failedByIp.set(log.ipAddress, (failedByIp.get(log.ipAddress) || 0) + 1);
+    }
+
+    const suspiciousIps = Array.from(failedByIp.entries())
+      .filter(([, c]) => c >= 3)
+      .sort((a, b) => b[1] - a[1])
+      .map(([ip, count]) => ({ ip, failedAttempts: count, isBlocked: blocked.some(b => b.ipAddress === ip) }));
+
+    const topIps = Array.from(ipCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([ip, count]) => ({
+        ip,
+        requests: count,
+        isBlocked: blocked.some(b => b.ipAddress === ip),
+        isSuspicious: (failedByIp.get(ip) || 0) >= 3,
+        recentActions: [...new Set(ipActions.get(ip) || [])].slice(0, 5),
+      }));
+
+    // Users by device / IP
+    const userDevices = await db.select({
+      id: usersTable.id, name: usersTable.name, email: usersTable.email,
+      deviceId: usersTable.deviceId, lastLoginIp: usersTable.lastLoginIp,
+      registrationIp: usersTable.registrationIp, lastLoginAt: usersTable.lastLoginAt,
+      status: usersTable.status, loginAttempts: usersTable.loginAttempts,
+      lockedUntil: usersTable.lockedUntil,
+    }).from(usersTable);
+
+    res.json({
+      suspiciousIps,
+      topIps,
+      blockedIps: blocked.map(b => ({ ...b, createdAt: b.createdAt.toISOString(), expiresAt: b.expiresAt?.toISOString() ?? null })),
+      lockedUsers: lockedUsers.map(u => ({ ...u, lockedUntil: u.lockedUntil?.toISOString() ?? null })),
+      userDevices: userDevices.map(u => ({ ...u, lastLoginAt: u.lastLoginAt?.toISOString() ?? null })),
+      totalUniqueIps: ipCounts.size,
+      totalFailedLogins: failedLogins.length,
+    });
+  } catch (e) { console.error(e); res.status(500).json({ error: "Failed to get security overview" }); }
+});
+
+// Unlock a user account
+router.post("/admin/security/unlock-user/:id", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    await db.update(usersTable).set({ loginAttempts: 0, lockedUntil: null, updatedAt: new Date() }).where(eq(usersTable.id, id));
+    res.json({ success: true });
+  } catch { res.status(500).json({ error: "Failed to unlock user" }); }
 });
 
 export default router;

@@ -22,6 +22,7 @@ import Analytics from "@/pages/analytics";
 import ActivityLogs from "@/pages/activity-logs";
 import Referrals from "@/pages/referrals";
 import Withdrawals from "@/pages/withdrawals";
+import Security from "@/pages/security";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -109,6 +110,12 @@ function Router() {
       <Route path="/withdrawals">
         <ProtectedRoute>
           <Layout><Withdrawals /></Layout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/security">
+        <ProtectedRoute>
+          <Layout><Security /></Layout>
         </ProtectedRoute>
       </Route>
 

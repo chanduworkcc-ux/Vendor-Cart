@@ -7,6 +7,8 @@ export const activityLogsTable = pgTable("activity_logs", {
   action: text("action").notNull(),
   details: text("details"),
   ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  deviceId: text("device_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
