@@ -104,6 +104,10 @@ function formatUser(user: typeof usersTable.$inferSelect) {
     role: user.role,
     status: user.status,
     emailVerified: user.emailVerified,
+    language: user.language,
+    theme: user.theme,
+    isOnline: user.isOnline,
+    lastSeen: user.lastSeen?.toISOString() ?? null,
     createdAt: user.createdAt.toISOString(),
     verificationCode: null,
   };

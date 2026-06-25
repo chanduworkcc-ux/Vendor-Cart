@@ -16,6 +16,9 @@ import Dashboard from "@/pages/dashboard";
 import Orders from "@/pages/orders";
 import OrderDetail from "@/pages/order-detail";
 import Notifications from "@/pages/notifications";
+import Profile from "@/pages/profile";
+import Tickets from "@/pages/tickets";
+import TicketDetail from "@/pages/ticket-detail";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -67,6 +70,30 @@ function Router() {
         <ProtectedRoute>
           <Layout>
             <Notifications />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/profile">
+        <ProtectedRoute>
+          <Layout>
+            <Profile />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/tickets">
+        <ProtectedRoute>
+          <Layout>
+            <Tickets />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/tickets/:id">
+        <ProtectedRoute>
+          <Layout>
+            <TicketDetail />
           </Layout>
         </ProtectedRoute>
       </Route>

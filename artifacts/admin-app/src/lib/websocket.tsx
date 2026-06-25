@@ -50,13 +50,27 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
             case "new_notification":
               queryClient.invalidateQueries({ queryKey: getListNotificationsQueryKey() });
               break;
+            case "user_online":
+            case "user_offline":
+              queryClient.invalidateQueries({ queryKey: getGetAdminStatsQueryKey() });
+              queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
+              break;
+            case "new_ticket":
+              toast({ title: "New Support Ticket", description: data.message || "A customer submitted a ticket." });
+              queryClient.invalidateQueries({ queryKey: ["admin-tickets"] });
+              queryClient.invalidateQueries({ queryKey: getGetAdminStatsQueryKey() });
+              break;
+            case "ticket_message":
+              toast({ title: "Ticket Reply", description: "A customer replied to their ticket." });
+              queryClient.invalidateQueries({ queryKey: ["admin-tickets"] });
+              queryClient.invalidateQueries({ queryKey: ["admin-ticket"] });
+              break;
           }
-        } catch (e) {
-          console.error("WS parse error", e);
-        }
+        } catch {}
       };
 
       ws.onclose = () => setTimeout(connect, 3000);
+      ws.onerror = () => {};
     };
 
     connect();

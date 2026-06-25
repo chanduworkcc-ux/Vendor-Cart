@@ -14,6 +14,10 @@ export const usersTable = pgTable("users", {
   status: userStatusEnum("status").notNull().default("pending"),
   emailVerified: boolean("email_verified").notNull().default(false),
   verificationCode: text("verification_code"),
+  language: text("language").notNull().default("en"),
+  theme: text("theme").notNull().default("light"),
+  isOnline: boolean("is_online").notNull().default(false),
+  lastSeen: timestamp("last_seen"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

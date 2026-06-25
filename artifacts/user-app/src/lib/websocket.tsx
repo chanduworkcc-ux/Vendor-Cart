@@ -66,25 +66,26 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
             case "settings_changed":
               queryClient.invalidateQueries({ queryKey: getGetAdminSettingsQueryKey() });
               break;
+            case "ticket_message":
+              toast({ title: "Support Reply", description: "Admin replied to your support ticket." });
+              queryClient.invalidateQueries({ queryKey: ["tickets"] });
+              break;
+            case "ticket_status_changed":
+              toast({ title: "Ticket Update", description: `Your ticket is now ${data.status}.` });
+              queryClient.invalidateQueries({ queryKey: ["tickets"] });
+              break;
           }
-        } catch (e) {
-          console.error("Failed to parse websocket message", e);
-        }
+        } catch {}
       };
 
-      ws.onclose = () => {
-        // Attempt to reconnect after 3 seconds
-        setTimeout(connect, 3000);
-      };
+      ws.onclose = () => { setTimeout(connect, 3000); };
+      ws.onerror = () => {};
     };
     
     connect();
 
     return () => {
-      if (ws) {
-        ws.onclose = null;
-        ws.close();
-      }
+      if (ws) { ws.onclose = null; ws.close(); }
     };
   }, [token, toast, queryClient, setLocation]);
 

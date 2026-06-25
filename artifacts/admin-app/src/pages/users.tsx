@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Loader2, UserCheck, UserX } from "lucide-react";
+import { Loader2, UserCheck, UserX, Wifi, WifiOff } from "lucide-react";
 
 export default function Users() {
   const search = useSearch();
@@ -102,6 +102,16 @@ export default function Users() {
                       <Link href={`/users/${u.id}`} className="font-medium hover:underline text-primary">
                         {u.name}
                       </Link>
+                      {(u as any).isOnline ? (
+                        <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                          <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse inline-block" />Online
+                        </span>
+                      ) : (u as any).lastSeen ? (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <WifiOff className="h-3 w-3" />
+                          {format(new Date((u as any).lastSeen), "MMM d, h:mm a")}
+                        </span>
+                      ) : null}
                       <Badge variant={u.status === "approved" ? "default" : u.status === "rejected" ? "destructive" : "secondary"}>
                         {u.status}
                       </Badge>

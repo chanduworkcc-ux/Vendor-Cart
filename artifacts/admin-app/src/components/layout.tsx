@@ -1,27 +1,41 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useListUsers, useListOrders } from "@workspace/api-client-react";
-import { LayoutDashboard, Users, Package, Bell, Settings, LogOut, Menu } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { LayoutDashboard, Users, Package, Bell, Settings, LogOut, Menu, MessageSquare, Wifi } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { logout, user } = useAuth();
+  const { logout, user, token } = useAuth();
   const [open, setOpen] = useState(false);
 
   const { data: usersData } = useListUsers({ status: "pending" }, { query: { enabled: !!user } });
   const { data: ordersData } = useListOrders({ status: "pending" }, { query: { enabled: !!user } });
+  const { data: ticketsData } = useQuery({
+    queryKey: ["admin-tickets"],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/api/tickets?admin=true`, { headers: { Authorization: `Bearer ${token}` } });
+      return res.json();
+    },
+    enabled: !!user,
+    refetchInterval: 15000,
+  });
 
   const pendingUsers = usersData?.total || 0;
   const pendingOrders = ordersData?.total || 0;
+  const openTickets = (ticketsData?.data || []).filter((t: any) => t.status === "open" || t.status === "in_progress").length;
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/users", label: "Users", icon: Users, badge: pendingUsers },
     { href: "/orders", label: "Orders", icon: Package, badge: pendingOrders },
+    { href: "/tickets", label: "Support Tickets", icon: MessageSquare, badge: openTickets },
     { href: "/notifications", label: "Notifications", icon: Bell },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
@@ -53,14 +67,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
           );
         })}
       </div>
-      <div className="mt-auto border-t pt-4">
-        <div className="mb-4 px-4 text-sm text-muted-foreground">
-          Admin<br />
-          <span className="font-medium text-foreground">{user?.email}</span>
+      <div className="mt-auto border-t pt-4 space-y-2">
+        <div className="px-4 py-2 rounded-lg bg-muted/50">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <Wifi className="h-3 w-3 text-green-500" />
+            <p className="text-xs text-green-600 font-medium">Admin</p>
+          </div>
+          <p className="text-sm font-semibold text-foreground truncate">{user?.name}</p>
+          <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
         </div>
-        <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground" onClick={logout}>
-          <LogOut className="mr-3 h-5 w-5" />
-          Log out
+        <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground hover:text-foreground" onClick={logout}>
+          <LogOut className="mr-3 h-4 w-4" />Log out
         </Button>
       </div>
     </>

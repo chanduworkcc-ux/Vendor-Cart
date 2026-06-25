@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable, ordersTable, notificationsTable, adminSettingsTable } from "@workspace/db/schema";
+import { usersTable, ordersTable, notificationsTable, adminSettingsTable, ticketsTable } from "@workspace/db/schema";
 import { eq, count, sql } from "drizzle-orm";
 import { requireAdmin, type AuthRequest } from "../lib/middleware";
-import { broadcastToAll } from "../lib/websocket";
+import { broadcastToAll, getOnlineUserIds } from "../lib/websocket";
 
 const router = Router();
 
@@ -65,6 +65,8 @@ router.get("/admin/stats", requireAdmin, async (_req, res) => {
     const users = await db.select().from(usersTable);
     const orders = await db.select().from(ordersTable);
     const notifications = await db.select().from(notificationsTable);
+    const tickets = await db.select().from(ticketsTable);
+    const onlineIds = getOnlineUserIds();
 
     res.json({
       totalUsers: users.length,
@@ -76,6 +78,10 @@ router.get("/admin/stats", requireAdmin, async (_req, res) => {
       shippedOrders: orders.filter(o => o.status === "shipped").length,
       deliveredOrders: orders.filter(o => o.status === "delivered").length,
       unreadNotifications: notifications.filter(n => !n.isRead && n.userId === null).length,
+      onlineUsers: onlineIds.length,
+      totalTickets: tickets.length,
+      openTickets: tickets.filter(t => t.status === "open" || t.status === "in_progress").length,
+      resolvedTickets: tickets.filter(t => t.status === "resolved").length,
     });
   } catch {
     res.status(500).json({ error: "Failed to get stats" });

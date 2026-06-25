@@ -7,6 +7,7 @@ export const orderStatusEnum = pgEnum("order_status", ["pending", "processing", 
 
 export const ordersTable = pgTable("orders", {
   id: serial("id").primaryKey(),
+  orderRef: text("order_ref"),
   userId: integer("user_id").notNull().references(() => usersTable.id),
   title: text("title").notNull(),
   description: text("description"),

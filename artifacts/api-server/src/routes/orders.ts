@@ -45,7 +45,14 @@ router.post("/orders", requireAuth, async (req: AuthRequest, res) => {
     if (!title || !quantity) {
       res.status(400).json({ error: "Title and quantity are required" }); return;
     }
+    // Generate orderRef: 2026-XXXX
+    const year = new Date().getFullYear();
+    const existingCount = await db.select().from(ordersTable);
+    const refNum = String(existingCount.length + 1).padStart(4, "0");
+    const orderRef = `${year}-${refNum}`;
+
     const [order] = await db.insert(ordersTable).values({
+      orderRef,
       userId: req.userId!,
       title,
       description: description || null,
@@ -188,6 +195,7 @@ function formatOrder(
 ) {
   return {
     id: order.id,
+    orderRef: order.orderRef ?? `${new Date().getFullYear()}-${String(order.id).padStart(4, "0")}`,
     userId: order.userId,
     userName: userName ?? null,
     userEmail: userEmail ?? null,
