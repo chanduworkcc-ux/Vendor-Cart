@@ -12,7 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useListProducts } from '@workspace/api-client-react';
+import { useListProducts } from '@/hooks/useProducts';
 import { useColors } from '@/hooks/useColors';
 import { useCart } from '@/context/CartContext';
 

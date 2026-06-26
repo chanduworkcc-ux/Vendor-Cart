@@ -16,7 +16,8 @@ import {
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { setBaseUrl, useListProducts, useListCategories } from '@workspace/api-client-react';
+import { setBaseUrl } from '@workspace/api-client-react';
+import { useListProducts, useListCategories } from '@/hooks/useProducts';
 import { useColors } from '@/hooks/useColors';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
