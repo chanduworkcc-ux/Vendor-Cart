@@ -1,7 +1,7 @@
-import { pgTable, serial, integer, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, integer, text, timestamp, pgEnum, boolean } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 
-export const withdrawalStatusEnum = pgEnum("withdrawal_status", ["created", "accepted", "delivered", "rejected"]);
+export const withdrawalStatusEnum = pgEnum("withdrawal_status", ["created", "accepted", "processing", "delivered", "rejected"]);
 
 export const withdrawalRequestsTable = pgTable("withdrawal_requests", {
   id: serial("id").primaryKey(),
@@ -11,6 +11,8 @@ export const withdrawalRequestsTable = pgTable("withdrawal_requests", {
   upiId: text("upi_id").notNull(),
   status: withdrawalStatusEnum("status").notNull().default("created"),
   adminNote: text("admin_note"),
+  isLocked: boolean("is_locked").notNull().default(false),
+  lockedAt: timestamp("locked_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

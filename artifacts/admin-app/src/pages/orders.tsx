@@ -4,7 +4,7 @@ import { useListOrders } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
-import { Loader2 } from "lucide-react";
+import { Loader2, Lock } from "lucide-react";
 
 const STATUS_OPTIONS = ["all", "pending", "processing", "shipped", "delivered", "cancelled"];
 
@@ -48,7 +48,15 @@ export default function Orders() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{data?.total ?? 0} orders</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            {orders.length} order{orders.length !== 1 ? "s" : ""}
+            {orders.filter((o: any) => o.isLocked).length > 0 && (
+              <span className="text-xs font-normal text-amber-600 flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                <Lock className="h-3 w-3" />
+                {orders.filter((o: any) => o.isLocked).length} locked
+              </span>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -63,15 +71,16 @@ export default function Orders() {
                 <thead>
                   <tr className="border-b text-muted-foreground">
                     <th className="pb-3 text-left font-medium">Order</th>
+                    <th className="pb-3 text-left font-medium">Ref</th>
                     <th className="pb-3 text-left font-medium">User</th>
-                    <th className="pb-3 text-left font-medium">Qty</th>
                     <th className="pb-3 text-left font-medium">Status</th>
+                    <th className="pb-3 text-left font-medium">Lock</th>
                     <th className="pb-3 text-left font-medium">Date</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {orders.map((o) => (
-                    <tr key={o.id} className="border-b last:border-0">
+                  {orders.map((o: any) => (
+                    <tr key={o.id} className={`border-b last:border-0 ${o.isLocked ? "bg-amber-50/40" : ""}`}>
                       <td className="py-3">
                         <Link href={`/orders/${o.id}`} className="font-medium hover:underline text-primary">
                           {o.title}
@@ -80,12 +89,21 @@ export default function Orders() {
                           <p className="text-xs text-muted-foreground mt-0.5 max-w-xs truncate">{o.description}</p>
                         )}
                       </td>
-                      <td className="py-3 text-muted-foreground">{o.userId}</td>
-                      <td className="py-3">{o.quantity}</td>
+                      <td className="py-3 font-mono text-xs text-muted-foreground">{o.orderRef || "—"}</td>
+                      <td className="py-3 text-muted-foreground">{o.userName || `#${o.userId}`}</td>
                       <td className="py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${statusColor[o.status] || "bg-gray-100 text-gray-800"}`}>
                           {o.status}
                         </span>
+                      </td>
+                      <td className="py-3">
+                        {o.isLocked ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-100 border border-amber-200 rounded-full px-2 py-0.5 font-medium">
+                            <Lock className="h-3 w-3" /> Locked
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td className="py-3 text-muted-foreground whitespace-nowrap">
                         {format(new Date(o.createdAt), "MMM d, yyyy")}

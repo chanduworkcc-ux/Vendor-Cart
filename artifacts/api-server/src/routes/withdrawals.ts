@@ -1,11 +1,27 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { usersTable, withdrawalRequestsTable, notificationsTable, adminSettingsTable } from "@workspace/db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { usersTable, withdrawalRequestsTable, notificationsTable, adminSettingsTable, activityLogsTable } from "@workspace/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { requireAuth, requireAdmin, type AuthRequest } from "../lib/middleware";
 import { broadcastToUser, broadcastToAdmins } from "../lib/websocket";
 
 const router = Router();
+
+const LOCKED_WITHDRAWAL_STATUSES = ["delivered", "rejected"] as const;
+
+function getIp(req: any): string {
+  return req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.ip || "unknown";
+}
+
+async function appendAuditLog(adminId: number, action: string, details: object, req: any) {
+  await db.insert(activityLogsTable).values({
+    userId: adminId,
+    action,
+    details: JSON.stringify(details),
+    ipAddress: getIp(req),
+    userAgent: req.headers["user-agent"] || "unknown",
+  }).catch(() => {});
+}
 
 async function getSettings() {
   const existing = await db.select().from(adminSettingsTable).limit(1);
@@ -18,7 +34,13 @@ async function getSettings() {
 router.post("/withdrawals", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { coins, upiId } = req.body;
-    if (!coins || !upiId) { res.status(400).json({ error: "Coins and UPI ID are required" }); return; }
+
+    if (!coins || typeof coins !== "number" || coins <= 0) {
+      res.status(400).json({ error: "A valid coin amount is required" }); return;
+    }
+    if (!upiId || typeof upiId !== "string" || upiId.trim().length < 3) {
+      res.status(400).json({ error: "A valid UPI ID is required" }); return;
+    }
 
     const settings = await getSettings();
     if (coins < settings.minWithdrawalCoins) {
@@ -33,7 +55,6 @@ router.post("/withdrawals", requireAuth, async (req: AuthRequest, res) => {
 
     const amountRupees = Math.floor(coins / settings.coinsPerRupee);
 
-    // Deduct coins
     await db.update(usersTable)
       .set({ coinBalance: user.coinBalance - coins, updatedAt: new Date() })
       .where(eq(usersTable.id, req.userId!));
@@ -42,17 +63,19 @@ router.post("/withdrawals", requireAuth, async (req: AuthRequest, res) => {
       userId: req.userId!,
       coins,
       amountRupees,
-      upiId,
+      upiId: upiId.trim(),
       status: "created",
     }).returning();
 
     broadcastToAdmins("new_withdrawal", { withdrawalId: withdrawal.id, userId: req.userId, coins, amountRupees });
 
     res.status(201).json(formatWithdrawal(withdrawal, user.name));
-  } catch { res.status(500).json({ error: "Failed to create withdrawal request" }); }
+  } catch {
+    res.status(500).json({ error: "Failed to create withdrawal request" });
+  }
 });
 
-// Get user withdrawals
+// Get withdrawals
 router.get("/withdrawals", requireAuth, async (req: AuthRequest, res) => {
   try {
     let withdrawals;
@@ -84,7 +107,9 @@ router.get("/withdrawals", requireAuth, async (req: AuthRequest, res) => {
         userEmail: row.userEmail,
       })),
     });
-  } catch { res.status(500).json({ error: "Failed to get withdrawals" }); }
+  } catch {
+    res.status(500).json({ error: "Failed to get withdrawals" });
+  }
 });
 
 // Admin: update withdrawal status
@@ -92,29 +117,70 @@ router.patch("/withdrawals/:id/status", requireAdmin, async (req: AuthRequest, r
   try {
     const id = parseInt(req.params.id);
     const { status, adminNote } = req.body;
-    const valid = ["accepted", "delivered", "rejected"];
-    if (!valid.includes(status)) { res.status(400).json({ error: "Invalid status" }); return; }
+
+    const valid = ["accepted", "processing", "delivered", "rejected"];
+    if (!valid.includes(status)) {
+      res.status(400).json({ error: "Invalid status. Valid values: accepted, processing, delivered, rejected" }); return;
+    }
 
     const [existing] = await db.select().from(withdrawalRequestsTable).where(eq(withdrawalRequestsTable.id, id)).limit(1);
     if (!existing) { res.status(404).json({ error: "Withdrawal not found" }); return; }
 
-    // If rejected, refund coins
-    if (status === "rejected" && existing.status === "created") {
-      const [currentUser] = await db.select({ coinBalance: usersTable.coinBalance }).from(usersTable).where(eq(usersTable.id, existing.userId)).limit(1);
+    // IMMUTABILITY CHECK: block updates on locked withdrawals
+    if (existing.isLocked) {
+      await appendAuditLog(req.userId!, "withdrawal_update_blocked_locked", {
+        withdrawalId: id,
+        attemptedStatus: status,
+        currentStatus: existing.status,
+        reason: "Withdrawal is locked (final state reached)",
+      }, req);
+      res.status(423).json({
+        error: `This withdrawal is permanently locked. It was finalized as "${existing.status}" and cannot be changed.`,
+        isLocked: true,
+        lockedAt: existing.lockedAt,
+      }); return;
+    }
+
+    const isTerminal = (LOCKED_WITHDRAWAL_STATUSES as readonly string[]).includes(status);
+    const now = new Date();
+
+    // Refund coins only if rejecting a non-refunded withdrawal
+    if (status === "rejected" && existing.status !== "rejected") {
+      const [currentUser] = await db.select({ coinBalance: usersTable.coinBalance })
+        .from(usersTable).where(eq(usersTable.id, existing.userId)).limit(1);
       await db.update(usersTable)
         .set({ coinBalance: (currentUser?.coinBalance ?? 0) + existing.coins, updatedAt: new Date() })
         .where(eq(usersTable.id, existing.userId));
     }
 
     const [updated] = await db.update(withdrawalRequestsTable)
-      .set({ status: status as any, adminNote: adminNote || null, updatedAt: new Date() })
+      .set({
+        status: status as any,
+        adminNote: adminNote?.trim() || existing.adminNote,
+        updatedAt: now,
+        ...(isTerminal ? { isLocked: true, lockedAt: now } : {}),
+      })
       .where(eq(withdrawalRequestsTable.id, id))
       .returning();
 
+    // Append immutable audit ledger entry
+    await appendAuditLog(req.userId!, "withdrawal_status_updated", {
+      withdrawalId: id,
+      userId: existing.userId,
+      coins: existing.coins,
+      amountRupees: existing.amountRupees,
+      upiId: existing.upiId,
+      previousStatus: existing.status,
+      newStatus: status,
+      lockedNow: isTerminal,
+      adminNote: adminNote || null,
+    }, req);
+
     const statusMessages: Record<string, string> = {
       accepted: "Your withdrawal request has been accepted and is being processed.",
+      processing: "Your withdrawal is currently being processed by our team.",
       delivered: "Your withdrawal has been successfully transferred to your UPI account.",
-      rejected: "Your withdrawal request has been rejected. Coins have been refunded.",
+      rejected: "Your withdrawal request has been rejected. Your coins have been refunded.",
     };
 
     await db.insert(notificationsTable).values({
@@ -125,11 +191,13 @@ router.patch("/withdrawals/:id/status", requireAdmin, async (req: AuthRequest, r
       isRead: false,
     });
 
-    broadcastToUser(existing.userId, "withdrawal_status_changed", { withdrawalId: id, status });
+    broadcastToUser(existing.userId, "withdrawal_status_changed", { withdrawalId: id, status, isLocked: updated.isLocked });
 
     const [user] = await db.select({ name: usersTable.name }).from(usersTable).where(eq(usersTable.id, existing.userId)).limit(1);
     res.json(formatWithdrawal(updated, user?.name));
-  } catch { res.status(500).json({ error: "Failed to update withdrawal" }); }
+  } catch {
+    res.status(500).json({ error: "Failed to update withdrawal" });
+  }
 });
 
 function formatWithdrawal(w: any, userName?: string) {
@@ -142,6 +210,8 @@ function formatWithdrawal(w: any, userName?: string) {
     upiId: w.upiId,
     status: w.status,
     adminNote: w.adminNote,
+    isLocked: w.isLocked ?? false,
+    lockedAt: w.lockedAt instanceof Date ? w.lockedAt.toISOString() : (w.lockedAt ?? null),
     createdAt: w.createdAt instanceof Date ? w.createdAt.toISOString() : w.createdAt,
     updatedAt: w.updatedAt instanceof Date ? w.updatedAt.toISOString() : w.updatedAt,
   };

@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, Loader2, Lock } from "lucide-react";
 
 const STATUS_OPTIONS = ["pending", "processing", "shipped", "delivered", "cancelled"];
 
@@ -28,11 +28,11 @@ const shippingSchema = z.object({
 type ShippingFormValues = z.infer<typeof shippingSchema>;
 
 const statusColor: Record<string, string> = {
-  pending: "bg-gray-100 text-gray-800",
+  pending:    "bg-gray-100 text-gray-800",
   processing: "bg-blue-100 text-blue-800",
-  shipped: "bg-orange-100 text-orange-800",
-  delivered: "bg-green-100 text-green-800",
-  cancelled: "bg-red-100 text-red-800",
+  shipped:    "bg-orange-100 text-orange-800",
+  delivered:  "bg-green-100 text-green-800",
+  cancelled:  "bg-red-100 text-red-800",
 };
 
 export default function OrderDetail() {
@@ -62,7 +62,15 @@ export default function OrderDetail() {
           toast({ title: "Status updated", description: `Order marked as ${status}.` });
           queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
         },
-        onError: () => toast({ title: "Error", description: "Failed to update status.", variant: "destructive" }),
+        onError: (err: any) => {
+          const msg = err?.response?.data?.error || err?.message || "Failed to update status.";
+          const isLocked = err?.response?.status === 423 || msg.includes("locked");
+          toast({
+            title: isLocked ? "🔒 Order Locked" : "Error",
+            description: msg,
+            variant: "destructive",
+          });
+        },
       }
     );
   };
@@ -75,7 +83,10 @@ export default function OrderDetail() {
           toast({ title: "Shipping details saved", description: "Order marked as shipped and user notified." });
           queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
         },
-        onError: () => toast({ title: "Error", description: "Failed to save shipping details.", variant: "destructive" }),
+        onError: (err: any) => {
+          const msg = err?.response?.data?.error || "Failed to save shipping details.";
+          toast({ title: "Error", description: msg, variant: "destructive" });
+        },
       }
     );
   };
@@ -88,20 +99,48 @@ export default function OrderDetail() {
     <div className="text-center py-16 text-muted-foreground">Order not found.</div>
   );
 
+  const isLocked = (order as any).isLocked === true;
+  const lockedAt = (order as any).lockedAt;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => setLocation("/orders")}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">{order.title}</h1>
-          <p className="text-muted-foreground">Order ID: {order.id}</p>
+        <div className="flex-1">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-3xl font-bold tracking-tight">{order.title}</h1>
+            {isLocked && (
+              <span className="inline-flex items-center gap-1.5 text-sm text-amber-700 bg-amber-100 border border-amber-200 rounded-full px-3 py-1 font-semibold">
+                <Lock className="h-4 w-4" /> Immutable Record
+              </span>
+            )}
+          </div>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            {(order as any).orderRef && <span className="font-mono mr-3">{(order as any).orderRef}</span>}
+            Order #{order.id}
+          </p>
         </div>
       </div>
 
+      {/* Lock banner */}
+      {isLocked && (
+        <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+          <Lock className="h-5 w-5 mt-0.5 text-amber-600 shrink-0" />
+          <div>
+            <p className="font-semibold">This order is permanently locked</p>
+            <p className="text-amber-700 mt-0.5">
+              It was finalized as <strong>"{order.status}"</strong> and cannot be modified further.
+              {lockedAt && ` Locked on ${format(new Date(lockedAt), "MMM d, yyyy 'at' h:mm a")}.`}
+              {" "}All previous status changes are preserved in the audit log.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+        <Card className={isLocked ? "opacity-90" : ""}>
           <CardHeader>
             <CardTitle>Order Details</CardTitle>
             <CardDescription>Placed on {format(new Date(order.createdAt), "MMM d, yyyy 'at' h:mm a")}</CardDescription>
@@ -136,28 +175,44 @@ export default function OrderDetail() {
             </div>
 
             <div className="pt-4 border-t">
-              <p className="text-sm font-medium mb-2">Update Status</p>
-              <Select value={order.status} onValueChange={handleStatusChange} disabled={updateStatus.isPending}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((s) => (
-                    <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isLocked ? (
+                <div className="flex items-center gap-2 text-amber-700 text-sm">
+                  <Lock className="h-4 w-4" />
+                  <span>Status updates are blocked — this order is locked.</span>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm font-medium mb-2">Update Status</p>
+                  <Select value={order.status} onValueChange={handleStatusChange} disabled={updateStatus.isPending}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_OPTIONS.map((s) => (
+                        <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {(order.status === "delivered" || order.status === "cancelled") && (
+                    <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                      <Lock className="h-3 w-3" /> Selecting this status will permanently lock the order.
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className={isLocked ? "opacity-90" : ""}>
           <CardHeader>
             <CardTitle>Shipping Details</CardTitle>
             <CardDescription>
-              {order.status === "shipped" || order.shippingPartner
-                ? "Shipping information on record"
-                : "Fill in to mark as shipped and notify user"}
+              {isLocked
+                ? "Shipping details are final — record is locked"
+                : order.status === "shipped" || order.shippingPartner
+                  ? "Shipping information on record"
+                  : "Fill in to mark as shipped and notify user"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -182,10 +237,17 @@ export default function OrderDetail() {
                     </a>
                   </div>
                 )}
-                <div className="pt-4 border-t">
-                  <p className="text-sm font-medium mb-3">Update Shipping</p>
-                  <ShippingForm form={shippingForm} onSubmit={onShippingSubmit} isPending={updateShipping.isPending} />
-                </div>
+                {!isLocked && (
+                  <div className="pt-4 border-t">
+                    <p className="text-sm font-medium mb-3">Update Shipping</p>
+                    <ShippingForm form={shippingForm} onSubmit={onShippingSubmit} isPending={updateShipping.isPending} />
+                  </div>
+                )}
+              </div>
+            ) : isLocked ? (
+              <div className="flex items-center gap-2 text-amber-700 text-sm py-4">
+                <Lock className="h-4 w-4" />
+                <span>Shipping details cannot be added — order is locked.</span>
               </div>
             ) : (
               <ShippingForm form={shippingForm} onSubmit={onShippingSubmit} isPending={updateShipping.isPending} />
