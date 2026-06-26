@@ -1,4 +1,4 @@
-import { pgTable, serial, boolean, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, serial, boolean, timestamp, integer, text } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -16,6 +16,14 @@ export const adminSettingsTable = pgTable("admin_settings", {
   loginEnabled: boolean("login_enabled").notNull().default(true),
   signupEnabled: boolean("signup_enabled").notNull().default(true),
   autoApproveRegistrations: boolean("auto_approve_registrations").notNull().default(false),
+  guestModeEnabled: boolean("guest_mode_enabled").notNull().default(false),
+  minOrderAmount: integer("min_order_amount").notNull().default(0),
+  codEnabled: boolean("cod_enabled").notNull().default(true),
+  paymentGateway: text("payment_gateway").notNull().default("cod_only"),
+  razorpayKeyId: text("razorpay_key_id"),
+  razorpayKeySecret: text("razorpay_key_secret"),
+  stripePublishableKey: text("stripe_publishable_key"),
+  stripeSecretKey: text("stripe_secret_key"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

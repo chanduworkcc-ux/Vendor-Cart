@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
+import { getApiBase } from '@/lib/adminApi';
 
 const ADMIN_PIN = '1234';
 
@@ -11,13 +12,12 @@ export interface BannerSlide {
 
 interface AdminContextType {
   isAdmin: boolean;
+  adminToken: string | null;
   adminLogin: (pin: string) => boolean;
+  adminLoginWithCredentials: (email: string, password: string) => Promise<boolean>;
   adminLogout: () => void;
   storeSettings: StoreSettings;
   updateStoreSettings: (s: Partial<StoreSettings>) => void;
-  announcements: Announcement[];
-  addAnnouncement: (text: string) => void;
-  removeAnnouncement: (id: string) => void;
   bannerSlides: BannerSlide[];
   addBannerSlide: (slide: Omit<BannerSlide, 'id'>) => void;
   removeBannerSlide: (id: string) => void;
@@ -35,12 +35,6 @@ export interface StoreSettings {
   maintenanceMode: boolean;
   allowGuestCheckout: boolean;
   autoConfirmOrders: boolean;
-}
-
-export interface Announcement {
-  id: string;
-  text: string;
-  createdAt: string;
 }
 
 const DEFAULT_SETTINGS: StoreSettings = {
@@ -81,10 +75,8 @@ const AdminContext = createContext<AdminContextType | null>(null);
 
 export function AdminProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminToken, setAdminToken] = useState<string | null>(null);
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(DEFAULT_SETTINGS);
-  const [announcements, setAnnouncements] = useState<Announcement[]>([
-    { id: '1', text: 'Free shipping on orders above ₹499!', createdAt: new Date().toISOString() },
-  ]);
   const [bannerSlides, setBannerSlides] = useState<BannerSlide[]>(DEFAULT_BANNERS);
 
   const adminLogin = useCallback((pin: string): boolean => {
@@ -92,28 +84,36 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
     return false;
   }, []);
 
-  const adminLogout = useCallback(() => setIsAdmin(false), []);
+  const adminLoginWithCredentials = useCallback(async (email: string, password: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`${getApiBase()}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      if (data.token && data.user?.role === 'admin') {
+        setAdminToken(data.token);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const adminLogout = useCallback(() => {
+    setIsAdmin(false);
+    setAdminToken(null);
+  }, []);
 
   const updateStoreSettings = useCallback((s: Partial<StoreSettings>) => {
     setStoreSettings((prev) => ({ ...prev, ...s }));
   }, []);
 
-  const addAnnouncement = useCallback((text: string) => {
-    setAnnouncements((prev) => [
-      { id: Date.now().toString(), text, createdAt: new Date().toISOString() },
-      ...prev,
-    ]);
-  }, []);
-
-  const removeAnnouncement = useCallback((id: string) => {
-    setAnnouncements((prev) => prev.filter((a) => a.id !== id));
-  }, []);
-
   const addBannerSlide = useCallback((slide: Omit<BannerSlide, 'id'>) => {
-    setBannerSlides((prev) => [
-      ...prev,
-      { ...slide, id: Date.now().toString() },
-    ]);
+    setBannerSlides((prev) => [...prev, { ...slide, id: Date.now().toString() }]);
   }, []);
 
   const removeBannerSlide = useCallback((id: string) => {
@@ -126,9 +126,8 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AdminContext.Provider value={{
-      isAdmin, adminLogin, adminLogout,
+      isAdmin, adminToken, adminLogin, adminLoginWithCredentials, adminLogout,
       storeSettings, updateStoreSettings,
-      announcements, addAnnouncement, removeAnnouncement,
       bannerSlides, addBannerSlide, removeBannerSlide, updateBannerSlide,
     }}>
       {children}

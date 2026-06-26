@@ -1,57 +1,94 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, Platform, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAdmin } from '@/context/AdminContext';
+import { adminFetch } from '@/lib/adminApi';
 
 interface Customer {
-  id: string; name: string; email: string; phone: string;
-  orders: number; totalSpent: number; location: string;
-  joinedDate: string; status: 'active' | 'blocked';
+  id: number;
+  name: string;
+  email: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: string;
 }
 
-const MOCK_CUSTOMERS: Customer[] = [
-  { id: '1', name: 'Rajesh Kumar', email: 'rajesh@example.com', phone: '+91 9876543210', orders: 5, totalSpent: 12498, location: 'Hyderabad', joinedDate: '2025-01-15', status: 'active' },
-  { id: '2', name: 'Priya Sharma', email: 'priya@example.com', phone: '+91 8765432109', orders: 3, totalSpent: 4497, location: 'Vijayawada', joinedDate: '2025-03-20', status: 'active' },
-  { id: '3', name: 'Arjun Reddy', email: 'arjun@example.com', phone: '+91 7654321098', orders: 8, totalSpent: 22344, location: 'Bangalore', joinedDate: '2024-11-05', status: 'active' },
-  { id: '4', name: 'Sneha Patel', email: 'sneha@example.com', phone: '+91 9543210987', orders: 2, totalSpent: 2898, location: 'Chennai', joinedDate: '2025-05-10', status: 'active' },
-  { id: '5', name: 'Mohammed Ali', email: 'ali@example.com', phone: '+91 9432109876', orders: 1, totalSpent: 2498, location: 'Hyderabad', joinedDate: '2025-06-01', status: 'blocked' },
-];
+const STATUS_COLORS: Record<string, string> = { approved: '#10B981', pending: '#F59E0B', rejected: '#EF4444' };
 
 export default function AdminCustomersScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [customers, setCustomers] = useState<Customer[]>(MOCK_CUSTOMERS);
+  const { adminToken } = useAdmin();
+  const qc = useQueryClient();
   const [selected, setSelected] = useState<Customer | null>(null);
   const topPadding = Platform.OS === 'web' ? 24 : insets.top;
 
-  const toggleBlock = (c: Customer) => {
-    setCustomers((prev) => prev.map((x) => x.id === c.id ? { ...x, status: x.status === 'blocked' ? 'active' : 'blocked' } : x));
-    setSelected((prev) => prev ? { ...prev, status: prev.status === 'blocked' ? 'active' : 'blocked' } : null);
-  };
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-customers-mobile'],
+    queryFn: async () => {
+      const res = await adminFetch('/api/users', adminToken);
+      if (!res.ok) throw new Error('Unauthorized');
+      return res.json();
+    },
+    enabled: !!adminToken,
+    retry: 1,
+  });
+
+  const customers: Customer[] = (data?.data || []).map((u: any) => ({
+    id: u.id, name: u.name, email: u.email, status: u.status, createdAt: u.createdAt,
+  }));
+
+  const statusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await adminFetch(`/api/users/${id}/status`, adminToken, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error('Failed');
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-customers-mobile'] }); setSelected(null); },
+  });
 
   const renderItem = ({ item }: { item: Customer }) => (
-    <TouchableOpacity style={[styles.card, { backgroundColor: colors.card, opacity: item.status === 'blocked' ? 0.7 : 1 }]} onPress={() => setSelected(item)} activeOpacity={0.8}>
+    <TouchableOpacity style={[styles.card, { backgroundColor: colors.card }]} onPress={() => setSelected(item)} activeOpacity={0.8}>
       <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
-        <Text style={styles.avatarText}>{item.name[0]}</Text>
+        <Text style={styles.avatarText}>{(item.name[0] ?? '?').toUpperCase()}</Text>
       </View>
       <View style={styles.info}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Text style={[styles.name, { color: colors.foreground }]}>{item.name}</Text>
-          {item.status === 'blocked' && (
-            <View style={[styles.blockedBadge, { backgroundColor: '#EF4444' + '20' }]}>
-              <Text style={{ color: '#EF4444', fontSize: 10, fontFamily: 'Inter_600SemiBold' }}>BLOCKED</Text>
-            </View>
-          )}
+          <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[item.status] + '20' }]}>
+            <Text style={{ color: STATUS_COLORS[item.status], fontSize: 10, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase' }}>{item.status}</Text>
+          </View>
         </View>
         <Text style={[styles.email, { color: colors.mutedForeground }]}>{item.email}</Text>
-        <Text style={[styles.meta, { color: colors.mutedForeground }]}>{item.orders} orders · ₹{item.totalSpent.toLocaleString()}</Text>
+        <Text style={[styles.meta, { color: colors.mutedForeground }]}>Joined {new Date(item.createdAt).toLocaleDateString()}</Text>
       </View>
       <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
     </TouchableOpacity>
   );
+
+  if (!adminToken) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { paddingTop: topPadding + 16 }]}>
+          <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
+            <Feather name="arrow-left" size={22} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Customers</Text>
+        </View>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <Feather name="lock" size={48} color={colors.mutedForeground} />
+          <Text style={{ color: colors.foreground, fontSize: 17, fontFamily: 'Inter_700Bold', marginTop: 16, textAlign: 'center' }}>API Access Required</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 8, textAlign: 'center' }}>Connect your admin account from the dashboard to view live customers.</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -66,9 +103,9 @@ export default function AdminCustomersScreen() {
       {/* Stats */}
       <View style={{ flexDirection: 'row', gap: 10, padding: 16 }}>
         {[
-          { label: 'Active', value: customers.filter((c) => c.status === 'active').length, color: '#10B981' },
-          { label: 'Blocked', value: customers.filter((c) => c.status === 'blocked').length, color: '#EF4444' },
-          { label: 'Total Revenue', value: `₹${customers.reduce((s, c) => s + c.totalSpent, 0).toLocaleString()}`, color: '#2563EB' },
+          { label: 'Approved', value: customers.filter((c) => c.status === 'approved').length, color: '#10B981' },
+          { label: 'Pending', value: customers.filter((c) => c.status === 'pending').length, color: '#F59E0B' },
+          { label: 'Rejected', value: customers.filter((c) => c.status === 'rejected').length, color: '#EF4444' },
         ].map((s) => (
           <View key={s.label} style={[styles.statChip, { backgroundColor: colors.card, flex: 1 }]}>
             <Text style={[styles.statVal, { color: s.color }]}>{s.value}</Text>
@@ -77,7 +114,23 @@ export default function AdminCustomersScreen() {
         ))}
       </View>
 
-      <FlatList data={customers} keyExtractor={(i) => i.id} renderItem={renderItem} contentContainerStyle={{ paddingHorizontal: 16, gap: 10, paddingBottom: 100 }} showsVerticalScrollIndicator={false} />
+      {isLoading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={customers} keyExtractor={(i) => String(i.id)} renderItem={renderItem}
+          contentContainerStyle={{ paddingHorizontal: 16, gap: 10, paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', padding: 40 }}>
+              <Feather name="users" size={40} color={colors.mutedForeground} />
+              <Text style={{ color: colors.mutedForeground, marginTop: 12, fontFamily: 'Inter_400Regular' }}>No customers found</Text>
+            </View>
+          }
+        />
+      )}
 
       <Modal visible={!!selected} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSelected(null)}>
         {selected && (
@@ -90,22 +143,16 @@ export default function AdminCustomersScreen() {
             <View style={{ padding: 20, gap: 12 }}>
               <View style={{ alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <View style={[styles.bigAvatar, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.bigAvatarText}>{selected.name[0]}</Text>
+                  <Text style={styles.bigAvatarText}>{(selected.name[0] ?? '?').toUpperCase()}</Text>
                 </View>
                 <Text style={[styles.name, { color: colors.foreground, fontSize: 18 }]}>{selected.name}</Text>
-                {selected.status === 'blocked' && (
-                  <View style={[styles.blockedBadge, { backgroundColor: '#EF4444' + '20' }]}>
-                    <Text style={{ color: '#EF4444', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>BLOCKED</Text>
-                  </View>
-                )}
+                <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[selected.status] + '20' }]}>
+                  <Text style={{ color: STATUS_COLORS[selected.status], fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase' }}>{selected.status}</Text>
+                </View>
               </View>
               {[
                 { label: 'Email', value: selected.email, icon: 'mail' },
-                { label: 'Phone', value: selected.phone, icon: 'phone' },
-                { label: 'Location', value: selected.location, icon: 'map-pin' },
-                { label: 'Joined', value: selected.joinedDate, icon: 'calendar' },
-                { label: 'Total Orders', value: String(selected.orders), icon: 'package' },
-                { label: 'Total Spent', value: `₹${selected.totalSpent.toLocaleString()}`, icon: 'dollar-sign' },
+                { label: 'Joined', value: new Date(selected.createdAt).toLocaleDateString(), icon: 'calendar' },
               ].map(({ label, value, icon }) => (
                 <View key={label} style={[styles.detailRow, { backgroundColor: colors.card }]}>
                   <Feather name={icon as any} size={16} color={colors.primary} />
@@ -113,14 +160,26 @@ export default function AdminCustomersScreen() {
                   <Text style={[styles.detailValue, { color: colors.foreground }]}>{value}</Text>
                 </View>
               ))}
-              <TouchableOpacity
-                style={[styles.blockBtn, { backgroundColor: selected.status === 'blocked' ? '#10B981' : '#EF4444', marginTop: 8 }]}
-                onPress={() => toggleBlock(selected)}
-                activeOpacity={0.85}
-              >
-                <Feather name={selected.status === 'blocked' ? 'user-check' : 'user-x'} size={16} color="#fff" />
-                <Text style={styles.blockBtnText}>{selected.status === 'blocked' ? 'Unblock Customer' : 'Block Customer'}</Text>
-              </TouchableOpacity>
+              {selected.status !== 'approved' && (
+                <TouchableOpacity
+                  style={[styles.blockBtn, { backgroundColor: '#10B981', marginTop: 8 }]}
+                  onPress={() => statusMutation.mutate({ id: selected.id, status: 'approved' })}
+                  activeOpacity={0.85}
+                >
+                  <Feather name="user-check" size={16} color="#fff" />
+                  <Text style={styles.blockBtnText}>Approve Customer</Text>
+                </TouchableOpacity>
+              )}
+              {selected.status !== 'rejected' && (
+                <TouchableOpacity
+                  style={[styles.blockBtn, { backgroundColor: '#EF4444' }]}
+                  onPress={() => statusMutation.mutate({ id: selected.id, status: 'rejected' })}
+                  activeOpacity={0.85}
+                >
+                  <Feather name="user-x" size={16} color="#fff" />
+                  <Text style={styles.blockBtnText}>Reject Customer</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         )}
@@ -144,7 +203,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   email: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
   meta: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  blockedBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   modalWrap: { flex: 1 },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: StyleSheet.hairlineWidth },
   modalTitle: { fontSize: 17, fontFamily: 'Inter_700Bold' },

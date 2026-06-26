@@ -30,6 +30,12 @@ router.get("/admin/settings", requireAdmin, async (_req, res) => {
       loginEnabled: settings.loginEnabled,
       signupEnabled: settings.signupEnabled,
       autoApproveRegistrations: settings.autoApproveRegistrations,
+      guestModeEnabled: settings.guestModeEnabled,
+      minOrderAmount: settings.minOrderAmount,
+      codEnabled: settings.codEnabled,
+      paymentGateway: settings.paymentGateway,
+      razorpayKeyId: settings.razorpayKeyId,
+      stripePublishableKey: settings.stripePublishableKey,
       updatedAt: settings.updatedAt.toISOString(),
     });
   } catch { res.status(500).json({ error: "Failed to get settings" }); }
@@ -43,6 +49,8 @@ router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
       coinsPerReferral, minWithdrawalCoins, coinsPerRupee,
       referralEnabled, maxLoginAttempts, lockDurationMinutes,
       loginEnabled, signupEnabled, autoApproveRegistrations,
+      guestModeEnabled, minOrderAmount, codEnabled, paymentGateway,
+      razorpayKeyId, razorpayKeySecret, stripePublishableKey, stripeSecretKey,
     } = req.body;
 
     const [updated] = await db.update(adminSettingsTable).set({
@@ -58,6 +66,14 @@ router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
       loginEnabled: loginEnabled !== undefined ? loginEnabled : settings.loginEnabled,
       signupEnabled: signupEnabled !== undefined ? signupEnabled : settings.signupEnabled,
       autoApproveRegistrations: autoApproveRegistrations !== undefined ? autoApproveRegistrations : settings.autoApproveRegistrations,
+      guestModeEnabled: guestModeEnabled !== undefined ? guestModeEnabled : settings.guestModeEnabled,
+      minOrderAmount: minOrderAmount !== undefined ? parseInt(minOrderAmount) : settings.minOrderAmount,
+      codEnabled: codEnabled !== undefined ? codEnabled : settings.codEnabled,
+      paymentGateway: paymentGateway !== undefined ? paymentGateway : settings.paymentGateway,
+      razorpayKeyId: razorpayKeyId !== undefined ? (razorpayKeyId || null) : settings.razorpayKeyId,
+      razorpayKeySecret: razorpayKeySecret !== undefined ? (razorpayKeySecret || null) : settings.razorpayKeySecret,
+      stripePublishableKey: stripePublishableKey !== undefined ? (stripePublishableKey || null) : settings.stripePublishableKey,
+      stripeSecretKey: stripeSecretKey !== undefined ? (stripeSecretKey || null) : settings.stripeSecretKey,
       updatedAt: new Date(),
     }).where(eq(adminSettingsTable.id, settings.id)).returning();
 
@@ -82,6 +98,12 @@ router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
       loginEnabled: updated.loginEnabled,
       signupEnabled: updated.signupEnabled,
       autoApproveRegistrations: updated.autoApproveRegistrations,
+      guestModeEnabled: updated.guestModeEnabled,
+      minOrderAmount: updated.minOrderAmount,
+      codEnabled: updated.codEnabled,
+      paymentGateway: updated.paymentGateway,
+      razorpayKeyId: updated.razorpayKeyId,
+      stripePublishableKey: updated.stripePublishableKey,
       updatedAt: updated.updatedAt.toISOString(),
     });
   } catch { res.status(500).json({ error: "Failed to update settings" }); }

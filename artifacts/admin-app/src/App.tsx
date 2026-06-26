@@ -25,6 +25,7 @@ import Withdrawals from "@/pages/withdrawals";
 import Security from "@/pages/security";
 import Coupons from "@/pages/coupons";
 import Tokens from "@/pages/tokens";
+import Products from "@/pages/products";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -130,6 +131,12 @@ function Router() {
       <Route path="/tokens">
         <ProtectedRoute>
           <Layout><Tokens /></Layout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/products">
+        <ProtectedRoute>
+          <Layout><Products /></Layout>
         </ProtectedRoute>
       </Route>
 

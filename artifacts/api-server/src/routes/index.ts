@@ -11,6 +11,8 @@ import referralsRouter from "./referrals";
 import withdrawalsRouter from "./withdrawals";
 import couponsRouter from "./coupons";
 import tokensRouter from "./tokens";
+import productsRouter from "./products";
+import announcementsRouter from "./announcements";
 
 const router: IRouter = Router();
 
@@ -26,5 +28,7 @@ router.use(referralsRouter);
 router.use(withdrawalsRouter);
 router.use(couponsRouter);
 router.use(tokensRouter);
+router.use(productsRouter);
+router.use(announcementsRouter);
 
 export default router;

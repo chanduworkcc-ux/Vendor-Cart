@@ -8,9 +8,16 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { Loader2, ShoppingCart, Wrench, Clock, Gift, Save, Shield, Lock, LogIn, UserPlus, UserCheck } from "lucide-react";
+import {
+  Loader2, ShoppingCart, Wrench, Clock, Gift, Save, Shield, Lock,
+  LogIn, UserPlus, UserCheck, CreditCard, Truck, Globe, Bell, Megaphone, Trash2, Plus,
+} from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+interface Announcement { id: number; text: string; isActive: boolean; createdAt: string; }
 
 export default function Settings() {
   const { toast } = useToast();
@@ -27,19 +34,44 @@ export default function Settings() {
     enabled: !!token,
   });
 
+  const { data: annData, refetch: refetchAnn } = useQuery({
+    queryKey: ["admin-announcements"],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/api/announcements`, { headers: { Authorization: `Bearer ${token}` } });
+      return res.json();
+    },
+    enabled: !!token,
+  });
+
+  // Store settings state
   const [acceptingOrders, setAcceptingOrders] = useState(true);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [referralEnabled, setReferralEnabled] = useState(true);
   const [loginEnabled, setLoginEnabled] = useState(true);
   const [signupEnabled, setSignupEnabled] = useState(true);
   const [autoApprove, setAutoApprove] = useState(false);
+  const [guestModeEnabled, setGuestModeEnabled] = useState(false);
   const [cooldownMin, setCooldownMin] = useState("120");
   const [coinsPerReferral, setCoinsPerReferral] = useState("100");
   const [minWithdrawal, setMinWithdrawal] = useState("1000");
   const [coinsPerRupee, setCoinsPerRupee] = useState("100");
   const [maxLoginAttempts, setMaxLoginAttempts] = useState("5");
   const [lockDurationMinutes, setLockDurationMinutes] = useState("30");
+  // Payment settings
+  const [minOrderAmount, setMinOrderAmount] = useState("0");
+  const [codEnabled, setCodEnabled] = useState(true);
+  const [paymentGateway, setPaymentGateway] = useState("cod_only");
+  const [razorpayKeyId, setRazorpayKeyId] = useState("");
+  const [razorpayKeySecret, setRazorpayKeySecret] = useState("");
+  const [stripePublishableKey, setStripePublishableKey] = useState("");
+  const [stripeSecretKey, setStripeSecretKey] = useState("");
+  // Announcements
+  const [newAnnText, setNewAnnText] = useState("");
+  const [addingAnn, setAddingAnn] = useState(false);
+
   const [saving, setSaving] = useState(false);
+
+  const announcements: Announcement[] = annData?.data || [];
 
   useEffect(() => {
     if (settings) {
@@ -49,12 +81,18 @@ export default function Settings() {
       setLoginEnabled(settings.loginEnabled ?? true);
       setSignupEnabled(settings.signupEnabled ?? true);
       setAutoApprove(settings.autoApproveRegistrations ?? false);
+      setGuestModeEnabled(settings.guestModeEnabled ?? false);
       setCooldownMin(String(settings.orderCooldownMinutes ?? 120));
       setCoinsPerReferral(String(settings.coinsPerReferral ?? 100));
       setMinWithdrawal(String(settings.minWithdrawalCoins ?? 1000));
       setCoinsPerRupee(String(settings.coinsPerRupee ?? 100));
       setMaxLoginAttempts(String(settings.maxLoginAttempts ?? 5));
       setLockDurationMinutes(String(settings.lockDurationMinutes ?? 30));
+      setMinOrderAmount(String(settings.minOrderAmount ?? 0));
+      setCodEnabled(settings.codEnabled ?? true);
+      setPaymentGateway(settings.paymentGateway ?? "cod_only");
+      setRazorpayKeyId(settings.razorpayKeyId ?? "");
+      setStripePublishableKey(settings.stripePublishableKey ?? "");
     }
   }, [settings]);
 
@@ -75,11 +113,42 @@ export default function Settings() {
     } finally { setSaving(false); }
   };
 
+  const addAnnouncement = async () => {
+    if (!newAnnText.trim()) return;
+    setAddingAnn(true);
+    try {
+      const res = await fetch(`${BASE}/api/announcements`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ text: newAnnText.trim() }) });
+      if (!res.ok) throw new Error();
+      refetchAnn();
+      setNewAnnText("");
+      toast({ title: "Announcement added" });
+    } catch { toast({ title: "Failed", variant: "destructive" }); }
+    finally { setAddingAnn(false); }
+  };
+
+  const toggleAnnouncement = async (a: Announcement) => {
+    try {
+      await fetch(`${BASE}/api/announcements/${a.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ isActive: !a.isActive }) });
+      refetchAnn();
+    } catch { toast({ title: "Failed", variant: "destructive" }); }
+  };
+
+  const deleteAnnouncement = async (id: number) => {
+    try {
+      await fetch(`${BASE}/api/announcements/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      refetchAnn();
+      toast({ title: "Removed" });
+    } catch { toast({ title: "Failed", variant: "destructive" }); }
+  };
+
   if (isLoading) return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
 
   const Toggle = ({ checked, onToggle, disabled }: { checked: boolean; onToggle: (v: boolean) => void; disabled?: boolean }) => (
     <Switch checked={checked} onCheckedChange={onToggle} disabled={saving || disabled} className="data-[state=checked]:bg-green-500 scale-125 ml-4" />
   );
+
+  const needsRazorpay = paymentGateway === "razorpay" || paymentGateway === "all";
+  const needsStripe = paymentGateway === "stripe" || paymentGateway === "all";
 
   return (
     <div className="space-y-6">
@@ -89,6 +158,38 @@ export default function Settings() {
       </div>
 
       <div className="grid gap-4 max-w-2xl">
+
+        {/* ─── Announcements ────────────────────────────────────────────── */}
+        <Card className="border-yellow-200">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Megaphone className="h-6 w-6 text-yellow-500" />
+              <div><CardTitle>Announcements</CardTitle><CardDescription>Banners shown to customers in the app</CardDescription></div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-2">
+              {announcements.length === 0 && <p className="text-sm text-muted-foreground">No announcements yet.</p>}
+              {announcements.map(a => (
+                <div key={a.id} className={`flex items-center gap-3 p-3 rounded-lg border ${a.isActive ? "border-green-200 bg-green-50/50" : "opacity-60"}`}>
+                  <Bell className="h-4 w-4 text-yellow-500 shrink-0" />
+                  <span className="flex-1 text-sm">{a.text}</span>
+                  <Badge variant={a.isActive ? "default" : "secondary"} className="text-xs">{a.isActive ? "Active" : "Off"}</Badge>
+                  <Switch checked={a.isActive} onCheckedChange={() => toggleAnnouncement(a)} className="scale-90" />
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive shrink-0" onClick={() => deleteAnnouncement(a.id)}>
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Input placeholder="e.g. Free shipping on orders above ₹499!" value={newAnnText} onChange={e => setNewAnnText(e.target.value)} onKeyDown={e => e.key === "Enter" && addAnnouncement()} className="text-sm" />
+              <Button variant="outline" size="sm" onClick={addAnnouncement} disabled={addingAnn}>
+                {addingAnn ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* ─── Login & Signup ─────────────────────────────────────────── */}
         <Card className="border-blue-200">
@@ -118,9 +219,17 @@ export default function Settings() {
             <div className="flex items-center justify-between p-3 rounded-lg border">
               <div>
                 <Label className="font-medium flex items-center gap-1.5"><UserCheck className="h-4 w-4" /> {autoApprove ? "🟢 Auto-Approve ON" : "🔵 Manual Approval"}</Label>
-                <p className="text-sm text-muted-foreground mt-0.5">{autoApprove ? "New accounts are approved instantly after email verification." : "Admin must manually approve each new account."}</p>
+                <p className="text-sm text-muted-foreground mt-0.5">{autoApprove ? "New accounts approved instantly." : "Admin must manually approve each new account."}</p>
               </div>
               <Toggle checked={autoApprove} onToggle={async v => { setAutoApprove(v); await save({ autoApproveRegistrations: v }); }} />
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg border">
+              <div>
+                <Label className="font-medium flex items-center gap-1.5"><Globe className="h-4 w-4" /> {guestModeEnabled ? "🟢 Guest Mode ON" : "🔵 Guest Mode OFF"}</Label>
+                <p className="text-sm text-muted-foreground mt-0.5">{guestModeEnabled ? "Users can browse and shop without signing in." : "Login required to use the app."}</p>
+              </div>
+              <Toggle checked={guestModeEnabled} onToggle={async v => { setGuestModeEnabled(v); await save({ guestModeEnabled: v }); }} />
             </div>
 
             <div className={`p-3 rounded-lg text-xs font-medium border ${loginEnabled && signupEnabled ? "bg-green-50 text-green-800 border-green-200" : "bg-red-50 text-red-800 border-red-200"}`}>
@@ -129,6 +238,94 @@ export default function Settings() {
                !loginEnabled ? "⚠️ Login disabled — existing users cannot sign in" :
                "ℹ️ Sign-up disabled — no new registrations allowed"}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* ─── Payment & Checkout ──────────────────────────────────────── */}
+        <Card className="border-green-200">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <CreditCard className="h-6 w-6 text-green-600" />
+              <div><CardTitle>Payment & Checkout</CardTitle><CardDescription>Configure payment gateways, COD, and minimum order</CardDescription></div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Min order amount */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5"><ShoppingCart className="h-4 w-4" /> Minimum Order Amount (₹)</Label>
+              <div className="flex gap-2 max-w-xs">
+                <Input type="number" min="0" value={minOrderAmount} onChange={e => setMinOrderAmount(e.target.value)} />
+                <Button variant="outline" onClick={() => save({ minOrderAmount: parseInt(minOrderAmount) || 0 })} disabled={saving}>
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">{parseInt(minOrderAmount) === 0 ? "No minimum order amount" : `Orders below ₹${minOrderAmount} will be rejected`}</p>
+            </div>
+
+            {/* COD toggle */}
+            <div className="flex items-center justify-between p-3 rounded-lg border">
+              <div>
+                <Label className="font-medium flex items-center gap-1.5"><Truck className="h-4 w-4" /> {codEnabled ? "🟢 Cash on Delivery ON" : "🔴 Cash on Delivery OFF"}</Label>
+                <p className="text-sm text-muted-foreground mt-0.5">{codEnabled ? "Customers can pay on delivery." : "COD not available — online payment only."}</p>
+              </div>
+              <Toggle checked={codEnabled} onToggle={async v => { setCodEnabled(v); await save({ codEnabled: v }); }} />
+            </div>
+
+            {/* Payment gateway selector */}
+            <div className="space-y-2">
+              <Label>Active Payment Gateway</Label>
+              <Select value={paymentGateway} onValueChange={v => { setPaymentGateway(v); save({ paymentGateway: v }); }}>
+                <SelectTrigger className="max-w-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cod_only">COD Only (no online payment)</SelectItem>
+                  <SelectItem value="razorpay">Razorpay</SelectItem>
+                  <SelectItem value="stripe">Stripe</SelectItem>
+                  <SelectItem value="all">All (Razorpay + Stripe + COD)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Razorpay credentials */}
+            {needsRazorpay && (
+              <div className="space-y-3 p-4 rounded-lg bg-blue-50 border border-blue-200">
+                <p className="text-sm font-semibold text-blue-800">Razorpay Configuration</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Key ID</Label>
+                    <Input placeholder="rzp_live_..." value={razorpayKeyId} onChange={e => setRazorpayKeyId(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Key Secret</Label>
+                    <Input type="password" placeholder="Secret key" value={razorpayKeySecret} onChange={e => setRazorpayKeySecret(e.target.value)} />
+                  </div>
+                </div>
+                <Button size="sm" onClick={() => save({ razorpayKeyId, razorpayKeySecret })} disabled={saving}>
+                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Save className="h-3.5 w-3.5 mr-1" />} Save Razorpay Keys
+                </Button>
+              </div>
+            )}
+
+            {/* Stripe credentials */}
+            {needsStripe && (
+              <div className="space-y-3 p-4 rounded-lg bg-violet-50 border border-violet-200">
+                <p className="text-sm font-semibold text-violet-800">Stripe Configuration</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Publishable Key</Label>
+                    <Input placeholder="pk_live_..." value={stripePublishableKey} onChange={e => setStripePublishableKey(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Secret Key</Label>
+                    <Input type="password" placeholder="sk_live_..." value={stripeSecretKey} onChange={e => setStripeSecretKey(e.target.value)} />
+                  </div>
+                </div>
+                <Button size="sm" onClick={() => save({ stripePublishableKey, stripeSecretKey })} disabled={saving}>
+                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Save className="h-3.5 w-3.5 mr-1" />} Save Stripe Keys
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 

@@ -1,29 +1,28 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, Modal,
-  TextInput, ScrollView, Alert, Platform,
+  TextInput, ScrollView, Alert, Platform, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAdmin } from '@/context/AdminContext';
+import { adminFetch } from '@/lib/adminApi';
 
 export interface AdminProduct {
-  id: string;
+  id: number;
   name: string;
-  category: string;
+  category: string | null;
   price: number;
+  discountPrice: number | null;
   stock: number;
-  description: string;
+  description: string | null;
   status: 'active' | 'draft' | 'archived';
+  images: string[];
+  badge: string | null;
 }
-
-const SEED: AdminProduct[] = [
-  { id: '1', name: 'Wireless Earbuds Pro', category: 'Electronics', price: 1999, stock: 45, description: 'Premium wireless earbuds with ANC.', status: 'active' },
-  { id: '2', name: 'Cotton Kurta Set', category: 'Clothing', price: 899, stock: 120, description: 'Handwoven cotton kurta for men.', status: 'active' },
-  { id: '3', name: 'Smart LED Bulb', category: 'Home', price: 349, stock: 0, description: 'Voice-controlled LED bulb 9W.', status: 'draft' },
-  { id: '4', name: 'Running Shoes', category: 'Footwear', price: 2499, stock: 30, description: 'Lightweight mesh running shoes.', status: 'active' },
-];
 
 const CATEGORIES = ['Electronics', 'Clothing', 'Home', 'Footwear', 'Books', 'Beauty', 'Accessories'];
 const STATUS_COLORS: Record<string, string> = { active: '#10B981', draft: '#F59E0B', archived: '#6B7280' };
@@ -31,7 +30,7 @@ const STATUS_COLORS: Record<string, string> = { active: '#10B981', draft: '#F59E
 function ProductModal({ visible, product, onSave, onClose }: {
   visible: boolean;
   product: AdminProduct | null;
-  onSave: (p: AdminProduct) => void;
+  onSave: (p: Partial<AdminProduct> & { id?: number }) => void;
   onClose: () => void;
 }) {
   const colors = useColors();
@@ -42,17 +41,27 @@ function ProductModal({ visible, product, onSave, onClose }: {
   const [stock, setStock] = useState(product ? String(product.stock) : '');
   const [desc, setDesc] = useState(product?.description ?? '');
   const [status, setStatus] = useState<AdminProduct['status']>(product?.status ?? 'active');
+  const [badge, setBadge] = useState(product?.badge ?? '');
 
   React.useEffect(() => {
-    if (product) { setName(product.name); setCategory(product.category); setPrice(String(product.price)); setStock(String(product.stock)); setDesc(product.description); setStatus(product.status); }
-    else { setName(''); setCategory('Electronics'); setPrice(''); setStock(''); setDesc(''); setStatus('active'); }
+    if (product) {
+      setName(product.name); setCategory(product.category ?? 'Electronics');
+      setPrice(String(product.price)); setStock(String(product.stock));
+      setDesc(product.description ?? ''); setStatus(product.status); setBadge(product.badge ?? '');
+    } else {
+      setName(''); setCategory('Electronics'); setPrice(''); setStock(''); setDesc(''); setStatus('active'); setBadge('');
+    }
   }, [product, visible]);
 
   const handleSave = () => {
     if (!name.trim()) { Alert.alert('Error', 'Product name is required.'); return; }
     if (!price || isNaN(Number(price))) { Alert.alert('Error', 'Enter a valid price.'); return; }
-    onSave({ id: product?.id ?? Date.now().toString(), name: name.trim(), category, price: Number(price), stock: Number(stock) || 0, description: desc.trim(), status });
-    onClose();
+    onSave({
+      id: product?.id,
+      name: name.trim(), category: category || null,
+      price: Number(price), stock: Number(stock) || 0,
+      description: desc.trim() || null, status, badge: badge.trim() || null,
+    });
   };
 
   return (
@@ -68,19 +77,16 @@ function ProductModal({ visible, product, onSave, onClose }: {
             { label: 'Product Name *', value: name, onChange: setName, placeholder: 'e.g. Wireless Earbuds' },
             { label: 'Price (₹) *', value: price, onChange: setPrice, placeholder: 'e.g. 1999', keyboard: 'numeric' },
             { label: 'Stock Quantity', value: stock, onChange: setStock, placeholder: 'e.g. 50', keyboard: 'numeric' },
+            { label: 'Badge', value: badge, onChange: setBadge, placeholder: 'e.g. New, Sale, Popular' },
             { label: 'Description', value: desc, onChange: setDesc, placeholder: 'Brief product description', multi: true },
           ].map((f) => (
             <View key={f.label}>
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{f.label}</Text>
               <TextInput
                 style={[styles.fieldInput, f.multi && { minHeight: 80 }, { backgroundColor: colors.card, color: colors.foreground, borderColor: colors.border }]}
-                value={f.value}
-                onChangeText={f.onChange}
-                placeholder={f.placeholder}
-                placeholderTextColor={colors.mutedForeground}
-                keyboardType={(f.keyboard as any) ?? 'default'}
-                multiline={!!f.multi}
-                textAlignVertical={f.multi ? 'top' : 'center'}
+                value={f.value} onChangeText={f.onChange} placeholder={f.placeholder}
+                placeholderTextColor={colors.mutedForeground} keyboardType={(f.keyboard as any) ?? 'default'}
+                multiline={!!f.multi} textAlignVertical={f.multi ? 'top' : 'center'}
               />
             </View>
           ))}
@@ -112,26 +118,55 @@ export default function AdminProductsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [products, setProducts] = useState<AdminProduct[]>(SEED);
+  const { adminToken } = useAdmin();
+  const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [editProduct, setEditProduct] = useState<AdminProduct | null>(null);
   const [showModal, setShowModal] = useState(false);
   const topPadding = Platform.OS === 'web' ? 24 : insets.top;
 
-  const filtered = products.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()) || p.category.toLowerCase().includes(search.toLowerCase()));
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-products'],
+    queryFn: async () => {
+      const res = await adminFetch('/api/products', adminToken);
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    retry: 1,
+  });
 
-  const saveProduct = (p: AdminProduct) => {
-    setProducts((prev) => {
-      const idx = prev.findIndex((x) => x.id === p.id);
-      if (idx >= 0) { const next = [...prev]; next[idx] = p; return next; }
-      return [p, ...prev];
-    });
-  };
+  const products: AdminProduct[] = data?.data || [];
+  const filtered = products.filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    (p.category ?? '').toLowerCase().includes(search.toLowerCase())
+  );
 
-  const deleteProduct = (id: string) => {
+  const saveMutation = useMutation({
+    mutationFn: async (p: Partial<AdminProduct> & { id?: number }) => {
+      const { id, ...body } = p;
+      const res = await adminFetch(id ? `/api/products/${id}` : '/api/products', adminToken, {
+        method: id ? 'PATCH' : 'POST',
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('Save failed');
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['admin-products'] }); setShowModal(false); setEditProduct(null); },
+    onError: () => Alert.alert('Error', 'Failed to save product.'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await adminFetch(`/api/products/${id}`, adminToken, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete failed');
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-products'] }),
+    onError: () => Alert.alert('Error', 'Failed to delete product.'),
+  });
+
+  const deleteProduct = (id: number) => {
     Alert.alert('Delete Product', 'Are you sure? This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => setProducts((prev) => prev.filter((p) => p.id !== id)) },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(id) },
     ]);
   };
 
@@ -142,9 +177,10 @@ export default function AdminProductsScreen() {
       </View>
       <View style={styles.productInfo}>
         <Text style={[styles.productName, { color: colors.foreground }]} numberOfLines={1}>{item.name}</Text>
-        <Text style={[styles.productMeta, { color: colors.mutedForeground }]}>{item.category} · Stock: {item.stock}</Text>
+        <Text style={[styles.productMeta, { color: colors.mutedForeground }]}>{item.category ?? 'Uncategorised'} · Stock: {item.stock}</Text>
         <View style={styles.productRow}>
           <Text style={[styles.productPrice, { color: colors.primary }]}>₹{item.price}</Text>
+          {item.discountPrice && <Text style={{ color: '#10B981', fontSize: 12, fontFamily: 'Inter_500Medium' }}>↓₹{item.discountPrice}</Text>}
           <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[item.status] + '20' }]}>
             <Text style={[styles.statusText, { color: STATUS_COLORS[item.status] }]}>{item.status}</Text>
           </View>
@@ -168,9 +204,11 @@ export default function AdminProductsScreen() {
           <Feather name="arrow-left" size={22} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Products</Text>
-        <TouchableOpacity onPress={() => { setEditProduct(null); setShowModal(true); }} style={styles.addBtn}>
-          <Feather name="plus" size={20} color="#fff" />
-        </TouchableOpacity>
+        {adminToken && (
+          <TouchableOpacity onPress={() => { setEditProduct(null); setShowModal(true); }} style={styles.addBtn}>
+            <Feather name="plus" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
       </View>
       <View style={[styles.searchBar, { backgroundColor: colors.card, margin: 16 }]}>
         <Feather name="search" size={16} color={colors.mutedForeground} />
@@ -178,10 +216,33 @@ export default function AdminProductsScreen() {
       </View>
       <View style={[styles.summaryRow, { paddingHorizontal: 16, marginBottom: 8 }]}>
         <Text style={[styles.summaryText, { color: colors.mutedForeground }]}>{filtered.length} products</Text>
-        <Text style={[styles.summaryText, { color: colors.success }]}>{products.filter((p) => p.status === 'active').length} active</Text>
+        <Text style={[styles.summaryText, { color: '#10B981' }]}>{products.filter((p) => p.status === 'active').length} active</Text>
       </View>
-      <FlatList data={filtered} keyExtractor={(i) => i.id} renderItem={renderItem} contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 100 }} showsVerticalScrollIndicator={false} ListEmptyComponent={<View style={{ alignItems: 'center', padding: 40 }}><Feather name="package" size={40} color={colors.mutedForeground} /><Text style={{ color: colors.mutedForeground, marginTop: 12, fontFamily: 'Inter_400Regular' }}>No products found</Text></View>} />
-      <ProductModal visible={showModal} product={editProduct} onSave={saveProduct} onClose={() => { setShowModal(false); setEditProduct(null); }} />
+      {isLoading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={colors.primary} />
+          <Text style={{ color: colors.mutedForeground, marginTop: 12, fontFamily: 'Inter_400Regular' }}>Loading products…</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filtered} keyExtractor={(i) => String(i.id)} renderItem={renderItem}
+          contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', padding: 40 }}>
+              <Feather name="package" size={40} color={colors.mutedForeground} />
+              <Text style={{ color: colors.mutedForeground, marginTop: 12, fontFamily: 'Inter_400Regular' }}>
+                {adminToken ? 'No products found' : 'No products found\n(Connect API to add products)'}
+              </Text>
+            </View>
+          }
+        />
+      )}
+      <ProductModal
+        visible={showModal} product={editProduct}
+        onSave={(p) => saveMutation.mutate(p)}
+        onClose={() => { setShowModal(false); setEditProduct(null); }}
+      />
     </View>
   );
 }

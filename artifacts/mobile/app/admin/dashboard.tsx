@@ -1,5 +1,8 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform,
+  Modal, TextInput, Alert, ActivityIndicator,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -7,6 +10,8 @@ import { useColors } from '@/hooks/useColors';
 import { useAdmin } from '@/context/AdminContext';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
+import { useQuery } from '@tanstack/react-query';
+import { adminFetch } from '@/lib/adminApi';
 
 interface StatCardProps { icon: string; label: string; value: string; color: string; onPress?: () => void }
 function StatCard({ icon, label, value, color, onPress }: StatCardProps) {
@@ -35,31 +40,100 @@ function QuickAction({ icon, label, color, onPress }: QuickActionProps) {
   );
 }
 
+function ConnectApiModal({ visible, onClose, onConnect }: { visible: boolean; onClose: () => void; onConnect: (email: string, password: string) => Promise<void> }) {
+  const colors = useColors();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleConnect = async () => {
+    if (!email.trim() || !password.trim()) { Alert.alert('Error', 'Enter admin email and password.'); return; }
+    setLoading(true);
+    await onConnect(email.trim(), password);
+    setLoading(false);
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={[{ flex: 1, backgroundColor: colors.background, padding: 24 }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <Text style={{ fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.foreground }}>Connect Live Data</Text>
+          <TouchableOpacity onPress={onClose}><Feather name="x" size={22} color={colors.foreground} /></TouchableOpacity>
+        </View>
+        <Text style={{ color: colors.mutedForeground, fontSize: 14, fontFamily: 'Inter_400Regular', marginBottom: 24 }}>
+          Enter your admin account credentials to connect to the live backend and view real orders, customers, and stats.
+        </Text>
+        <Text style={{ fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.mutedForeground, marginBottom: 6, textTransform: 'uppercase' }}>Admin Email</Text>
+        <TextInput
+          style={{ backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.foreground, marginBottom: 16, fontFamily: 'Inter_400Regular' }}
+          value={email} onChangeText={setEmail} placeholder="admin@example.com" placeholderTextColor={colors.mutedForeground} keyboardType="email-address" autoCapitalize="none"
+        />
+        <Text style={{ fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.mutedForeground, marginBottom: 6, textTransform: 'uppercase' }}>Password</Text>
+        <TextInput
+          style={{ backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.foreground, marginBottom: 24, fontFamily: 'Inter_400Regular' }}
+          value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor={colors.mutedForeground} secureTextEntry
+        />
+        <TouchableOpacity
+          style={{ backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 15, alignItems: 'center' }}
+          onPress={handleConnect} disabled={loading} activeOpacity={0.85}
+        >
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontSize: 16, fontFamily: 'Inter_600SemiBold' }}>Connect</Text>}
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+}
+
 export default function AdminDashboard() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { storeSettings, adminLogout, announcements } = useAdmin();
+  const { storeSettings, adminLogout, adminToken, adminLoginWithCredentials } = useAdmin();
   const { totalItems: cartItems } = useCart();
   const { totalItems: wishlistItems } = useWishlist();
   const topPadding = Platform.OS === 'web' ? 24 : insets.top;
+  const [showConnect, setShowConnect] = useState(false);
 
   const handleLogout = () => {
     adminLogout();
     router.replace('/(tabs)/profile');
   };
 
-  const RECENT_ACTIVITY = [
-    { icon: 'user', text: 'New customer registered', time: '2 min ago', color: '#10B981' },
-    { icon: 'shopping-bag', text: 'Order #1042 placed', time: '15 min ago', color: '#2563EB' },
-    { icon: 'heart', text: '3 items added to wishlists', time: '1 hr ago', color: '#EF4444' },
-    { icon: 'star', text: 'New 5-star review received', time: '2 hr ago', color: '#F59E0B' },
-    { icon: 'package', text: 'Order #1041 shipped', time: '3 hr ago', color: '#8B5CF6' },
-  ];
+  const { data: stats } = useQuery({
+    queryKey: ['admin-stats-mobile'],
+    queryFn: async () => {
+      const res = await adminFetch('/api/admin/stats', adminToken);
+      if (!res.ok) throw new Error('Unauthorized');
+      return res.json();
+    },
+    enabled: !!adminToken,
+    refetchInterval: 60_000,
+  });
+
+  const { data: annData } = useQuery({
+    queryKey: ['announcements-mobile'],
+    queryFn: async () => {
+      const res = await adminFetch('/api/announcements', null);
+      if (!res.ok) return { data: [] };
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+
+  const announcements = annData?.data || [];
+
+  const handleConnect = async (email: string, password: string) => {
+    const ok = await adminLoginWithCredentials(email, password);
+    if (ok) {
+      setShowConnect(false);
+      Alert.alert('Connected!', 'Live data is now active.');
+    } else {
+      Alert.alert('Failed', 'Invalid admin credentials or not an admin account.');
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
       <View style={[styles.header, { paddingTop: topPadding + 16, backgroundColor: colors.primary }]}>
         <View>
           <Text style={styles.headerSub}>Admin Dashboard</Text>
@@ -75,6 +149,21 @@ export default function AdminDashboard() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: Platform.OS === 'web' ? 80 : 110, gap: 0 }}
       >
+        {/* Live data banner */}
+        {!adminToken && (
+          <TouchableOpacity style={[styles.warningBanner, { backgroundColor: '#EFF6FF' }]} onPress={() => setShowConnect(true)}>
+            <Feather name="wifi-off" size={16} color="#2563EB" />
+            <Text style={[styles.warningText, { color: '#2563EB' }]}>Tap to connect live data — enter admin credentials</Text>
+            <Feather name="chevron-right" size={14} color="#2563EB" />
+          </TouchableOpacity>
+        )}
+        {adminToken && (
+          <View style={[styles.warningBanner, { backgroundColor: '#F0FDF4' }]}>
+            <Feather name="wifi" size={16} color="#10B981" />
+            <Text style={[styles.warningText, { color: '#10B981' }]}>Live data connected</Text>
+          </View>
+        )}
+
         {/* Maintenance Mode Warning */}
         {storeSettings.maintenanceMode && (
           <View style={[styles.warningBanner, { backgroundColor: '#FEF3C7' }]}>
@@ -85,10 +174,10 @@ export default function AdminDashboard() {
 
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
-          <StatCard icon="shopping-bag" label="Total Orders" value="0" color="#2563EB" onPress={() => router.push('/admin/orders')} />
-          <StatCard icon="dollar-sign" label="Revenue" value="₹0" color="#10B981" onPress={() => router.push('/admin/analytics')} />
-          <StatCard icon="package" label="Products" value="0" color="#8B5CF6" onPress={() => router.push('/admin/products')} />
-          <StatCard icon="users" label="Customers" value="0" color="#F59E0B" onPress={() => router.push('/admin/customers')} />
+          <StatCard icon="shopping-bag" label="Total Orders" value={stats ? String(stats.totalOrders) : '—'} color="#2563EB" onPress={() => router.push('/admin/orders')} />
+          <StatCard icon="users" label="Total Users" value={stats ? String(stats.totalUsers) : '—'} color="#10B981" onPress={() => router.push('/admin/customers')} />
+          <StatCard icon="package" label="Pending Orders" value={stats ? String(stats.pendingOrders) : '—'} color="#8B5CF6" onPress={() => router.push('/admin/orders')} />
+          <StatCard icon="clock" label="Pending Users" value={stats ? String(stats.pendingUsers) : '—'} color="#F59E0B" onPress={() => router.push('/admin/customers')} />
           <StatCard icon="heart" label="Wishlists" value={String(wishlistItems)} color="#EF4444" />
           <StatCard icon="shopping-cart" label="Cart Items" value={String(cartItems)} color="#06B6D4" onPress={() => router.push('/admin/orders')} />
         </View>
@@ -107,36 +196,22 @@ export default function AdminDashboard() {
         </View>
 
         {/* Announcements */}
-        <View style={styles.section}>
-          <View style={styles.sectionRow}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Announcements</Text>
-            <TouchableOpacity onPress={() => router.push('/admin/settings')}>
-              <Text style={[styles.seeAll, { color: colors.primary }]}>Manage</Text>
-            </TouchableOpacity>
-          </View>
-          {announcements.slice(0, 2).map((a) => (
-            <View key={a.id} style={[styles.announcementCard, { backgroundColor: colors.card, borderLeftColor: colors.primary }]}>
-              <Feather name="megaphone" size={14} color={colors.primary} />
-              <Text style={[styles.announcementText, { color: colors.foreground }]}>{a.text}</Text>
+        {announcements.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionRow}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Announcements</Text>
+              <TouchableOpacity onPress={() => router.push('/admin/settings')}>
+                <Text style={[styles.seeAll, { color: colors.primary }]}>Manage</Text>
+              </TouchableOpacity>
             </View>
-          ))}
-        </View>
-
-        {/* Recent Activity */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Activity</Text>
-          <View style={[styles.activityCard, { backgroundColor: colors.card }]}>
-            {RECENT_ACTIVITY.map((item, i) => (
-              <View key={i} style={[styles.activityRow, { borderBottomColor: colors.border, borderBottomWidth: i < RECENT_ACTIVITY.length - 1 ? StyleSheet.hairlineWidth : 0 }]}>
-                <View style={[styles.activityIcon, { backgroundColor: item.color + '20' }]}>
-                  <Feather name={item.icon as any} size={14} color={item.color} />
-                </View>
-                <Text style={[styles.activityText, { color: colors.foreground }]}>{item.text}</Text>
-                <Text style={[styles.activityTime, { color: colors.mutedForeground }]}>{item.time}</Text>
+            {announcements.filter((a: any) => a.isActive).slice(0, 2).map((a: any) => (
+              <View key={a.id} style={[styles.announcementCard, { backgroundColor: colors.card, borderLeftColor: colors.primary }]}>
+                <Feather name="megaphone" size={14} color={colors.primary} />
+                <Text style={[styles.announcementText, { color: colors.foreground }]}>{a.text}</Text>
               </View>
             ))}
           </View>
-        </View>
+        )}
 
         {/* Admin Nav */}
         <View style={styles.section}>
@@ -167,6 +242,8 @@ export default function AdminDashboard() {
           </View>
         </View>
       </ScrollView>
+
+      <ConnectApiModal visible={showConnect} onClose={() => setShowConnect(false)} onConnect={handleConnect} />
     </View>
   );
 }
@@ -195,11 +272,6 @@ const styles = StyleSheet.create({
   qaLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', textAlign: 'center' },
   announcementCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, borderLeftWidth: 3, marginBottom: 8, elevation: 1 },
   announcementText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular' },
-  activityCard: { borderRadius: 16, overflow: 'hidden', elevation: 1 },
-  activityRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  activityIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  activityText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular' },
-  activityTime: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   navCard: { borderRadius: 16, overflow: 'hidden', elevation: 1 },
   navRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 14 },
   navIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
