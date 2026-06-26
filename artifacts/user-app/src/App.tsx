@@ -12,6 +12,7 @@ import Login from "@/pages/login";
 import Register from "@/pages/register";
 import VerifyEmail from "@/pages/verify-email";
 import Pending from "@/pages/pending";
+import Suspended from "@/pages/suspended";
 import Dashboard from "@/pages/dashboard";
 import Orders from "@/pages/orders";
 import OrderDetail from "@/pages/order-detail";
@@ -20,6 +21,7 @@ import Profile from "@/pages/profile";
 import Tickets from "@/pages/tickets";
 import TicketDetail from "@/pages/ticket-detail";
 import Referral from "@/pages/referral";
+import WalletPage from "@/pages/wallet";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,10 +38,16 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/verify-email" component={VerifyEmail} />
-      
+
       <Route path="/pending">
         <ProtectedRoute requireApproved={false}>
           <Pending />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/suspended">
+        <ProtectedRoute requireApproved={false}>
+          <Suspended />
         </ProtectedRoute>
       </Route>
 
@@ -103,6 +111,14 @@ function Router() {
         <ProtectedRoute>
           <Layout>
             <Referral />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/wallet">
+        <ProtectedRoute>
+          <Layout>
+            <WalletPage />
           </Layout>
         </ProtectedRoute>
       </Route>

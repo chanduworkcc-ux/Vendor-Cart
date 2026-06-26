@@ -10,6 +10,7 @@ import profileRouter from "./profile";
 import referralsRouter from "./referrals";
 import withdrawalsRouter from "./withdrawals";
 import couponsRouter from "./coupons";
+import tokensRouter from "./tokens";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(profileRouter);
 router.use(referralsRouter);
 router.use(withdrawalsRouter);
 router.use(couponsRouter);
+router.use(tokensRouter);
 
 export default router;

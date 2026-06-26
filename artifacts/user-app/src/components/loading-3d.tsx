@@ -66,7 +66,7 @@ export function Loading3D({ message = "Loading..." }: { message?: string }) {
         dots.sort((a, b) => a.z - b.z);
         for (const d of dots) {
           const p = project(d.x, d.y, d.z);
-          const size = p.scale * 4;
+          const size = Math.max(0.1, p.scale * 4);
           const alpha = 0.4 + d.alpha * 0.6;
           const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size);
           g.addColorStop(0, `hsla(${hue}, 80%, 70%, ${alpha})`);

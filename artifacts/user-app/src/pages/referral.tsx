@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Gift, Copy, Loader2, Wallet, IndianRupee, CheckCircle, Share2, Users } from "lucide-react";
+import { Gift, Copy, Loader2, Wallet, IndianRupee, CheckCircle, Share2, Users, Clock, CircleCheck, RefreshCw, Banknote, CircleDot } from "lucide-react";
 import { format } from "date-fns";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -100,11 +100,52 @@ export default function Referral() {
   const estimatedRupees = Math.floor(enteredCoins / coinsPerRupee);
   const withdrawals = withdrawalData?.data || [];
 
-  const STATUS_COLORS: Record<string, string> = {
-    created: "bg-blue-100 text-blue-800 border-blue-200",
-    accepted: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    delivered: "bg-green-100 text-green-800 border-green-200",
-    rejected: "bg-red-100 text-red-800 border-red-200",
+  const MILESTONE_STEPS = [
+    {
+      key: "created",
+      label: "Withdrawal Created",
+      desc: (w: any) => `Requested ₹${w.amountRupees} to ${w.upiId}`,
+      icon: Clock,
+      activeColor: "bg-blue-500",
+      textColor: "text-blue-600",
+      ringColor: "ring-blue-200",
+    },
+    {
+      key: "accepted",
+      label: "Admin Accepted",
+      desc: () => "Request reviewed and approved",
+      icon: CircleCheck,
+      activeColor: "bg-yellow-500",
+      textColor: "text-yellow-600",
+      ringColor: "ring-yellow-200",
+    },
+    {
+      key: "processing",
+      label: "Processing",
+      desc: () => "Payment is being processed",
+      icon: RefreshCw,
+      activeColor: "bg-orange-500",
+      textColor: "text-orange-600",
+      ringColor: "ring-orange-200",
+    },
+    {
+      key: "delivered",
+      label: "Delivered",
+      desc: () => "Funds successfully transferred",
+      icon: Banknote,
+      activeColor: "bg-green-500",
+      textColor: "text-green-600",
+      ringColor: "ring-green-200",
+    },
+  ];
+
+  const STATUS_ORDER: Record<string, number> = {
+    created: 0,
+    accepted: 1,
+    processing: 2,
+    reverting: 2,
+    delivered: 3,
+    rejected: -1,
   };
 
   return (
@@ -231,29 +272,96 @@ export default function Referral() {
         </CardContent>
       </Card>
 
-      {/* Withdrawal history */}
+      {/* Withdrawal history — vertical milestone timeline */}
       {withdrawals.length > 0 && (
         <Card>
-          <CardHeader><CardTitle>Withdrawal History</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Withdrawal History</CardTitle>
+          </CardHeader>
           <CardContent>
-            <div className="space-y-2 max-h-72 overflow-y-auto">
-              {withdrawals.map((w: any) => (
-                <div key={w.id} className="p-3 rounded-lg border space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="font-medium">🪙 {w.coins}</span>
-                      <span className="text-muted-foreground">→</span>
-                      <span className="font-bold text-green-600 flex items-center"><IndianRupee className="h-3 w-3" />{w.amountRupees}</span>
+            <div className="space-y-8">
+              {withdrawals.map((w: any) => {
+                const currentStep = STATUS_ORDER[w.status] ?? 0;
+                const isRejected = w.status === "rejected";
+                return (
+                  <div key={w.id} className="border rounded-xl overflow-hidden">
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-3 bg-muted/40 border-b">
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="font-bold">🪙 {w.coins}</span>
+                        <span className="text-muted-foreground">→</span>
+                        <span className="font-bold text-green-700 flex items-center gap-0.5">
+                          <IndianRupee className="h-3 w-3" />{w.amountRupees}
+                        </span>
+                        <span className="text-xs text-muted-foreground font-mono">· {w.upiId}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">{format(new Date(w.createdAt), "MMM d, yyyy")}</span>
                     </div>
-                    <Badge className={STATUS_COLORS[w.status] || "bg-gray-100 text-gray-800"}>{w.status}</Badge>
+
+                    {/* Rejected state */}
+                    {isRejected ? (
+                      <div className="px-4 py-5 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full bg-red-100 border-2 border-red-300 flex items-center justify-center shrink-0">
+                          <CircleDot className="h-4 w-4 text-red-500" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-red-600">Withdrawal Rejected</p>
+                          {w.adminNote && <p className="text-xs text-muted-foreground mt-0.5 italic">{w.adminNote}</p>}
+                        </div>
+                      </div>
+                    ) : (
+                      /* Vertical milestone timeline */
+                      <div className="px-4 py-5">
+                        <div className="relative">
+                          {/* Vertical track line */}
+                          <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-border" />
+
+                          <div className="space-y-0">
+                            {MILESTONE_STEPS.map((step, idx) => {
+                              const isDone = idx <= currentStep;
+                              const isCurrent = idx === currentStep;
+                              const Icon = step.icon;
+                              return (
+                                <div key={step.key} className="relative flex items-start gap-4 pb-6 last:pb-0">
+                                  {/* Node */}
+                                  <div className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-300
+                                    ${isDone
+                                      ? `${step.activeColor} border-transparent ring-2 ring-offset-1 ${step.ringColor}`
+                                      : "bg-background border-border"
+                                    }`}>
+                                    <Icon className={`h-3.5 w-3.5 ${isDone ? "text-white" : "text-muted-foreground"} ${isCurrent && step.key !== "delivered" ? "animate-pulse" : ""}`} />
+                                  </div>
+
+                                  {/* Label */}
+                                  <div className="pt-0.5 min-w-0">
+                                    <p className={`text-sm font-semibold ${isDone ? step.textColor : "text-muted-foreground"}`}>
+                                      {step.label}
+                                      {isCurrent && !isDone && (
+                                        <span className="ml-2 text-xs font-normal text-muted-foreground">(in progress)</span>
+                                      )}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">{step.desc(w)}</p>
+                                    {isCurrent && idx === 0 && (
+                                      <p className="text-xs text-muted-foreground mt-0.5">
+                                        {format(new Date(w.createdAt), "MMM d, yyyy · h:mm a")}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        {w.adminNote && (
+                          <p className="text-xs text-muted-foreground italic border-t pt-3 mt-3">
+                            Admin note: {w.adminNote}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="font-mono">{w.upiId}</span>
-                    <span>{format(new Date(w.createdAt), "MMM d, yyyy")}</span>
-                  </div>
-                  {w.adminNote && <p className="text-xs text-muted-foreground italic border-t pt-1">{w.adminNote}</p>}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>

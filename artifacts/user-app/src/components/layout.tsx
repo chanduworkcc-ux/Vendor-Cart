@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useListNotifications } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
-import { Package, LayoutDashboard, Bell, LogOut, Menu, User, MessageSquare, Gift, Coins } from "lucide-react";
+import { Package, LayoutDashboard, Bell, LogOut, Menu, User, MessageSquare, Gift, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
@@ -37,6 +37,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
     { href: "/orders", label: "My Orders", icon: Package },
     { href: "/referral", label: "Referral & Coins", icon: Gift },
+    { href: "/wallet", label: "Token Wallet", icon: Wallet },
     { href: "/tickets", label: "Support", icon: MessageSquare, badge: openTickets },
     { href: "/notifications", label: "Notifications", icon: Bell, badge: unreadCount },
     { href: "/profile", label: "Profile", icon: User },
