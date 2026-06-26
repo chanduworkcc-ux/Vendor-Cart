@@ -9,6 +9,8 @@ interface AuthContextType {
   token: string | null;
   setToken: (token: string | null) => void;
   logout: () => void;
+  isImpersonating: boolean;
+  returnToAdmin: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -16,6 +18,9 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setTokenState] = useState<string | null>(() => {
     return localStorage.getItem("token");
+  });
+  const [isImpersonating, setIsImpersonating] = useState<boolean>(() => {
+    return localStorage.getItem("impersonating_admin") === "1";
   });
   const [, setLocation] = useLocation();
 
@@ -34,7 +39,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     setToken(null);
+    localStorage.removeItem("impersonating_admin");
+    setIsImpersonating(false);
     setLocation("/login");
+  };
+
+  const returnToAdmin = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("impersonating_admin");
+    setTokenState(null);
+    setIsImpersonating(false);
+    window.location.href = "/admin-app/";
   };
 
   const { data: user, isLoading: isUserLoading, error } = useGetMe({
@@ -46,13 +61,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (error) {
-      // Token is invalid or expired
       logout();
     }
   }, [error]);
 
   return (
-    <AuthContext.Provider value={{ user: user || null, isLoading: isUserLoading, token, setToken, logout }}>
+    <AuthContext.Provider value={{ user: user || null, isLoading: isUserLoading, token, setToken, logout, isImpersonating, returnToAdmin }}>
       {children}
     </AuthContext.Provider>
   );

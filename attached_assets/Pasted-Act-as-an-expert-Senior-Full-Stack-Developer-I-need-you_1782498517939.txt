@@ -1,0 +1,25 @@
+Act as an expert Senior Full-Stack Developer. I need you to fix access-control errors, secure my web application, isolate the user interface, and optimize the codebase for a flawless Vercel deployment. 
+
+Apply the following logic strictly across the entire application:
+
+1. User Interface Isolation (Hide Admin Elements)
+- Completely hide all admin panel elements, buttons, dashboards, and navigation hooks from the standard public interface. Only show the user application section.
+- Normal users must only see the core user application interface. Under no circumstances should any admin components or layouts render for unauthenticated or non-admin profiles.
+
+2. Hide & Protect Admin URLs
+- Do not expose any admin URLs, backend administration routing pathways, or metadata in the client-side JavaScript bundle or page routes.
+- If a user attempts to manually type or guess an admin URL, automatically intercept the request and redirect them back to the main user application homepage or render a 404 page.
+
+3. "Login As User" Impersonation Button for Admins
+- Implement or fix the Admin Impersonation feature: The admin must be able to log directly into a specific user's view by clicking a dedicated "Login as User" / "View Profile" button from within their authorized administrative context.
+- Ensure that clicking this button securely sets the session state to reflect that user's view, rendering ONLY the user application interface while safely preserving the active admin authentication state under the hood.
+
+4. Total Code Audit and Error Resolution
+- Scan the application logs, build outputs, router configurations, and component dependencies for any breaking bugs, unhandled exceptions, or console errors.
+- Fix all remaining syntax, typing, runtime, and deployment-blocking errors across the repository to ensure everything operates completely smoothly.
+
+5. Prepare for Vercel Deployment
+- Audit the routing configuration (e.g., configuring a proper vercel.json file if using vanilla/legacy setups, or ensuring proper SSR/CSR behavior if using Next.js/React).
+- Verify that environment variables, build commands, and output directories are completely structured for zero-error production building on Vercel.
+
+Review your changes, implement the security patches, test the session transitions, and let me know when the build succeeds.

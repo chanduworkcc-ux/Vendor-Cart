@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useListNotifications } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
-import { Package, LayoutDashboard, Bell, LogOut, Menu, User, MessageSquare, Gift, Wallet, ShoppingBag } from "lucide-react";
+import { Package, LayoutDashboard, Bell, LogOut, Menu, User, MessageSquare, Gift, Wallet, ShoppingBag, ArrowLeft, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
@@ -13,7 +13,7 @@ const BASE = "";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
-  const { logout, user } = useAuth();
+  const { logout, user, isImpersonating, returnToAdmin } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const { data: notificationsData } = useListNotifications(
@@ -125,6 +125,25 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex flex-1 flex-col min-w-0">
+        {isImpersonating && (
+          <div className="flex items-center justify-between gap-3 bg-indigo-600 px-4 py-2 text-white text-sm">
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 shrink-0" />
+              <span>
+                <strong>Admin view:</strong> You are viewing as <strong>{user?.name || user?.email}</strong>. Actions performed here affect this user's account.
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="shrink-0 text-indigo-700 border-indigo-200 bg-white hover:bg-indigo-50 text-xs"
+              onClick={returnToAdmin}
+            >
+              <ArrowLeft className="h-3 w-3 mr-1" />
+              Return to Admin
+            </Button>
+          </div>
+        )}
         <header className="flex h-14 items-center border-b bg-card px-4 justify-between">
           <div className="flex items-center gap-3">
             <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>

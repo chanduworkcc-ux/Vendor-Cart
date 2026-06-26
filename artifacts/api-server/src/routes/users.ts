@@ -4,6 +4,7 @@ import { usersTable, notificationsTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAuth, requireAdmin, type AuthRequest } from "../lib/middleware";
 import { broadcastToUser } from "../lib/websocket";
+import { signToken } from "../lib/auth";
 
 const router = Router();
 
@@ -129,6 +130,19 @@ router.post("/users/:userId/add-coins", requireAdmin, async (req: AuthRequest, r
     broadcastToUser(userId, "coin_balance_updated", { coinBalance: newBalance, change: amount });
     res.json({ coinBalance: updated.coinBalance, change: amount });
   } catch { res.status(500).json({ error: "Failed to update coins" }); }
+});
+
+// Admin: impersonate a user — generates a short-lived token for that user's session
+router.post("/admin/impersonate/:userId", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const userId = parseInt(String(req.params.userId));
+    if (isNaN(userId)) { res.status(400).json({ error: "Invalid user ID" }); return; }
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    if (!user) { res.status(404).json({ error: "User not found" }); return; }
+    if (user.role === "admin") { res.status(400).json({ error: "Cannot impersonate an admin account" }); return; }
+    const token = signToken({ userId: user.id, role: user.role });
+    res.json({ token, user: formatUser(user) });
+  } catch { res.status(500).json({ error: "Failed to generate impersonation token" }); }
 });
 
 function formatUser(user: typeof usersTable.$inferSelect) {

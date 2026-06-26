@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { format } from "date-fns";
-import { ArrowLeft, Loader2, UserCheck, UserX, Ban, Clock, Coins, Shield, Globe, Smartphone, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Loader2, UserCheck, UserX, Ban, Clock, Shield, Globe, Smartphone, AlertTriangle, LogIn } from "lucide-react";
 import { Link } from "wouter";
 
 const BASE = "";
@@ -137,6 +137,33 @@ export default function UserDetail() {
                   </SelectContent>
                 </Select>
               </div>
+              {user.role !== "admin" && (
+                <Button
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                  onClick={async () => {
+                    setActionLoading("impersonate");
+                    try {
+                      const res = await fetch(`${BASE}/api/admin/impersonate/${id}`, {
+                        method: "POST",
+                        headers: { Authorization: `Bearer ${token}` },
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error);
+                      localStorage.setItem("token", data.token);
+                      localStorage.setItem("impersonating_admin", "1");
+                      window.location.href = "/user-app/";
+                    } catch (e: any) {
+                      toast({ title: "Impersonation failed", description: e.message, variant: "destructive" });
+                    } finally {
+                      setActionLoading(null);
+                    }
+                  }}
+                  disabled={actionLoading === "impersonate"}
+                >
+                  {actionLoading === "impersonate" ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <LogIn className="h-4 w-4 mr-2" />}
+                  Login as User
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
