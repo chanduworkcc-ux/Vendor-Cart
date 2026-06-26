@@ -88,7 +88,7 @@ router.patch("/notifications/read-all", requireAuth, async (req: AuthRequest, re
 
 router.patch("/notifications/:notificationId/read", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.notificationId);
+    const id = parseInt(String(req.params.notificationId));
     const [updated] = await db.update(notificationsTable)
       .set({ isRead: true })
       .where(eq(notificationsTable.id, id))
@@ -103,7 +103,7 @@ router.patch("/notifications/:notificationId/read", requireAuth, async (req: Aut
 // Track impression (notification was rendered on screen)
 router.post("/notifications/:notificationId/impression", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.notificationId);
+    const id = parseInt(String(req.params.notificationId));
     await db.update(notificationsTable)
       .set({ impressions: sql`${notificationsTable.impressions} + 1` })
       .where(eq(notificationsTable.id, id));
@@ -116,7 +116,7 @@ router.post("/notifications/:notificationId/impression", requireAuth, async (req
 // Track click (user tapped the notification)
 router.post("/notifications/:notificationId/click", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.notificationId);
+    const id = parseInt(String(req.params.notificationId));
     await db.update(notificationsTable)
       .set({ clicks: sql`${notificationsTable.clicks} + 1` })
       .where(eq(notificationsTable.id, id));

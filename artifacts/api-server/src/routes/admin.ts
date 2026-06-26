@@ -279,7 +279,7 @@ router.post("/admin/security/block-ip", requireAdmin, async (req: AuthRequest, r
 
 router.delete("/admin/security/block-ip/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [b] = await db.select().from(blockedIpsTable).where(eq(blockedIpsTable.id, id)).limit(1);
     if (!b) { res.status(404).json({ error: "Not found" }); return; }
     await db.delete(blockedIpsTable).where(eq(blockedIpsTable.id, id));
@@ -356,7 +356,7 @@ router.get("/admin/security/overview", requireAdmin, async (_req, res) => {
 
 router.post("/admin/security/unlock-user/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     await db.update(usersTable).set({ loginAttempts: 0, lockedUntil: null, updatedAt: new Date() }).where(eq(usersTable.id, id));
     res.json({ success: true });
   } catch { res.status(500).json({ error: "Failed to unlock user" }); }

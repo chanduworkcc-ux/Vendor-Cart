@@ -115,7 +115,7 @@ router.get("/withdrawals", requireAuth, async (req: AuthRequest, res) => {
 // Admin: update withdrawal status
 router.patch("/withdrawals/:id/status", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const { status, adminNote } = req.body;
 
     const valid = ["accepted", "processing", "delivered", "rejected"];

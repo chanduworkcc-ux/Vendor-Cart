@@ -174,7 +174,7 @@ router.post("/orders", requireAuth, async (req: AuthRequest, res) => {
 
 router.get("/orders/:orderId", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const orderId = parseInt(req.params.orderId);
+    const orderId = parseInt(String(req.params.orderId));
     const [result] = await db
       .select({ order: ordersTable, userName: usersTable.name, userEmail: usersTable.email })
       .from(ordersTable)
@@ -194,7 +194,7 @@ router.get("/orders/:orderId", requireAuth, async (req: AuthRequest, res) => {
 
 router.patch("/orders/:orderId/status", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const orderId = parseInt(req.params.orderId);
+    const orderId = parseInt(String(req.params.orderId));
     const { status, notes } = req.body;
 
     const validStatuses = ["pending", "processing", "shipped", "delivered", "cancelled"];
@@ -271,7 +271,7 @@ router.patch("/orders/:orderId/status", requireAdmin, async (req: AuthRequest, r
 
 router.patch("/orders/:orderId/shipping", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const orderId = parseInt(req.params.orderId);
+    const orderId = parseInt(String(req.params.orderId));
     const { shippingPartner, deliveryDate, trackingLink, notes } = req.body;
 
     if (!shippingPartner || !deliveryDate || !trackingLink) {

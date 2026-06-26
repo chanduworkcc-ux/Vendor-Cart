@@ -50,7 +50,7 @@ router.post("/tickets", requireAuth, async (req: AuthRequest, res) => {
 // Get ticket
 router.get("/tickets/:ticketId", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const ticketId = parseInt(req.params.ticketId);
+    const ticketId = parseInt(String(req.params.ticketId));
     const [row] = await db.select({ ticket: ticketsTable, userName: usersTable.name, userEmail: usersTable.email })
       .from(ticketsTable).leftJoin(usersTable, eq(ticketsTable.userId, usersTable.id))
       .where(eq(ticketsTable.id, ticketId)).limit(1);
@@ -89,7 +89,7 @@ router.get("/tickets/:ticketId", requireAuth, async (req: AuthRequest, res) => {
 // Update ticket status (admin only)
 router.patch("/tickets/:ticketId/status", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const ticketId = parseInt(req.params.ticketId);
+    const ticketId = parseInt(String(req.params.ticketId));
     const { status } = req.body;
     if (!["open", "in_progress", "resolved", "closed"].includes(status)) {
       res.status(400).json({ error: "Invalid status" }); return;
@@ -114,7 +114,7 @@ router.patch("/tickets/:ticketId/status", requireAdmin, async (req: AuthRequest,
 // Send message in ticket
 router.post("/tickets/:ticketId/messages", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const ticketId = parseInt(req.params.ticketId);
+    const ticketId = parseInt(String(req.params.ticketId));
     const { message } = req.body;
     if (!message?.trim()) { res.status(400).json({ error: "Message is required" }); return; }
 

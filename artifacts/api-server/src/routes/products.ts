@@ -61,7 +61,7 @@ router.get("/products/:id", async (req, res) => {
   try {
     const isAdmin = (req as AuthRequest).userRole === "admin";
     const [p] = await db.select().from(productsTable)
-      .where(eq(productsTable.id, parseInt(req.params.id))).limit(1);
+      .where(eq(productsTable.id, parseInt(String(req.params.id)))).limit(1);
     if (!p) { res.status(404).json({ error: "Product not found" }); return; }
     // Customers cannot access deleted products
     if (!isAdmin && p.deletedAt) { res.status(404).json({ error: "Product not found" }); return; }
@@ -101,7 +101,7 @@ router.post("/products", requireAdmin, async (req: AuthRequest, res) => {
 // PATCH /api/products/:id — admin only (general update)
 router.patch("/products/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [existing] = await db.select().from(productsTable).where(eq(productsTable.id, id)).limit(1);
     if (!existing) { res.status(404).json({ error: "Product not found" }); return; }
 
@@ -135,7 +135,7 @@ router.patch("/products/:id", requireAdmin, async (req: AuthRequest, res) => {
 // POST /api/products/:id/add-stock — admin only: add units to stock
 router.post("/products/:id/add-stock", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const qty = parseInt(req.body.quantity);
     if (!qty || qty < 1) { res.status(400).json({ error: "quantity must be a positive integer" }); return; }
 
@@ -156,7 +156,7 @@ router.post("/products/:id/add-stock", requireAdmin, async (req: AuthRequest, re
 // PATCH /api/products/:id/out-of-stock — admin only: mark out of stock (stock = 0)
 router.patch("/products/:id/out-of-stock", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [existing] = await db.select().from(productsTable).where(eq(productsTable.id, id)).limit(1);
     if (!existing) { res.status(404).json({ error: "Product not found" }); return; }
 
@@ -174,7 +174,7 @@ router.patch("/products/:id/out-of-stock", requireAdmin, async (req: AuthRequest
 // DELETE /api/products/:id — admin only (SOFT DELETE: hidden from customers, recoverable)
 router.delete("/products/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const [existing] = await db.select().from(productsTable).where(eq(productsTable.id, id)).limit(1);
     if (!existing) { res.status(404).json({ error: "Product not found" }); return; }
 
@@ -214,7 +214,7 @@ router.post("/categories", requireAdmin, async (req: AuthRequest, res) => {
 
 router.delete("/categories/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const [del] = await db.delete(categoriesTable).where(eq(categoriesTable.id, parseInt(req.params.id))).returning();
+    const [del] = await db.delete(categoriesTable).where(eq(categoriesTable.id, parseInt(String(req.params.id)))).returning();
     if (!del) { res.status(404).json({ error: "Category not found" }); return; }
     res.json({ success: true });
   } catch {

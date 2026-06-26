@@ -45,7 +45,7 @@ router.get("/admin/coupons", requireAdmin, async (_req, res) => {
 // ─── ADMIN: Update coupon ─────────────────────────────────────────────────────
 router.patch("/admin/coupons/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const { description, type, discountType, discountValue, bonusCoins, maxUses, expiresAt, assignedUserId, isActive } = req.body;
 
     const [existing] = await db.select().from(couponsTable).where(eq(couponsTable.id, id)).limit(1);

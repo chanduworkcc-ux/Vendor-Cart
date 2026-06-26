@@ -19,7 +19,7 @@ router.get("/tokens", requireAuth, async (_req, res) => {
 // GET /api/tokens/my-balances — current user's balances for all tokens
 router.get("/tokens/my-balances", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const userId = req.user!.id;
+    const userId = req.userId!;
     const tokens = await db.select().from(coinTokensTable).orderBy(coinTokensTable.createdAt);
     const balances = await db
       .select()
@@ -40,7 +40,7 @@ router.get("/tokens/my-balances", requireAuth, async (req: AuthRequest, res) => 
 // GET /api/tokens/my-transactions — current user's transaction history
 router.get("/tokens/my-transactions", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const userId = req.user!.id;
+    const userId = req.userId!;
     const txns = await db
       .select({
         id: tokenTransactionsTable.id,
@@ -84,7 +84,7 @@ router.post("/tokens", requireAdmin, async (req: AuthRequest, res) => {
 // PATCH /api/tokens/:id — admin: update token type
 router.patch("/tokens/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const { name, emoji, color, description } = req.body;
     const [updated] = await db
       .update(coinTokensTable)
@@ -101,7 +101,7 @@ router.patch("/tokens/:id", requireAdmin, async (req: AuthRequest, res) => {
 // DELETE /api/tokens/:id — admin: delete token type
 router.delete("/tokens/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     await db.delete(coinTokensTable).where(eq(coinTokensTable.id, id));
     res.json({ success: true });
   } catch {
@@ -112,7 +112,7 @@ router.delete("/tokens/:id", requireAdmin, async (req: AuthRequest, res) => {
 // POST /api/tokens/:id/mint — admin: mint tokens to a user
 router.post("/tokens/:id/mint", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const tokenId = parseInt(req.params.id);
+    const tokenId = parseInt(String(req.params.id));
     const { userId, amount, note } = req.body;
     if (!userId || !amount || amount <= 0) {
       return res.status(400).json({ error: "userId and a positive amount are required" });
@@ -150,7 +150,7 @@ router.post("/tokens/:id/mint", requireAdmin, async (req: AuthRequest, res) => {
       amount: parseInt(amount),
       type: "mint",
       note: note || null,
-      mintedBy: req.user!.id,
+      mintedBy: req.userId!,
     });
 
     res.json({ success: true, message: `Minted ${amount} ${token[0].symbol} to ${user[0].name}` });
@@ -162,7 +162,7 @@ router.post("/tokens/:id/mint", requireAdmin, async (req: AuthRequest, res) => {
 // POST /api/tokens/:id/deduct — admin: deduct tokens from a user
 router.post("/tokens/:id/deduct", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const tokenId = parseInt(req.params.id);
+    const tokenId = parseInt(String(req.params.id));
     const { userId, amount, note } = req.body;
     if (!userId || !amount || amount <= 0) {
       return res.status(400).json({ error: "userId and a positive amount are required" });
@@ -260,7 +260,7 @@ router.get("/admin/token-transactions", requireAdmin, async (_req, res) => {
 // GET /api/admin/users/:userId/tokens — admin: get a specific user's token balances
 router.get("/admin/users/:userId/tokens", requireAdmin, async (req, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(String(req.params.userId));
     const tokens = await db.select().from(coinTokensTable).orderBy(coinTokensTable.createdAt);
     const balances = await db
       .select()

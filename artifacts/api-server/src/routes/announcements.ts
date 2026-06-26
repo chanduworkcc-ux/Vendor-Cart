@@ -33,7 +33,7 @@ router.post("/announcements", requireAdmin, async (req: AuthRequest, res) => {
 // PATCH /api/announcements/:id — admin (toggle active, edit text)
 router.patch("/announcements/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id));
     const { text, isActive } = req.body;
     const [existing] = await db.select().from(announcementsTable).where(eq(announcementsTable.id, id)).limit(1);
     if (!existing) { res.status(404).json({ error: "Announcement not found" }); return; }
@@ -54,7 +54,7 @@ router.patch("/announcements/:id", requireAdmin, async (req: AuthRequest, res) =
 // DELETE /api/announcements/:id — admin
 router.delete("/announcements/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const [del] = await db.delete(announcementsTable).where(eq(announcementsTable.id, parseInt(req.params.id))).returning();
+    const [del] = await db.delete(announcementsTable).where(eq(announcementsTable.id, parseInt(String(req.params.id)))).returning();
     if (!del) { res.status(404).json({ error: "Announcement not found" }); return; }
     broadcastToAll("announcement_updated", {});
     res.json({ success: true });

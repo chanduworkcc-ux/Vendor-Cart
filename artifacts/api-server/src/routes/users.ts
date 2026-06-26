@@ -19,7 +19,7 @@ router.get("/users", requireAdmin, async (req: AuthRequest, res) => {
 
 router.get("/users/:userId", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(String(req.params.userId));
     if (req.userRole !== "admin" && req.userId !== userId) { res.status(403).json({ error: "Access denied" }); return; }
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
@@ -29,7 +29,7 @@ router.get("/users/:userId", requireAuth, async (req: AuthRequest, res) => {
 
 router.patch("/users/:userId/status", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(String(req.params.userId));
     const { status, reason } = req.body;
     if (!["approved", "rejected"].includes(status)) { res.status(400).json({ error: "Invalid status" }); return; }
     const [updated] = await db.update(usersTable).set({ status, updatedAt: new Date() }).where(eq(usersTable.id, userId)).returning();
@@ -44,7 +44,7 @@ router.patch("/users/:userId/status", requireAdmin, async (req: AuthRequest, res
 
 router.patch("/users/:userId/role", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(String(req.params.userId));
     const { role } = req.body;
     if (!["user", "admin", "special"].includes(role)) { res.status(400).json({ error: "Invalid role" }); return; }
     const [updated] = await db.update(usersTable).set({ role, updatedAt: new Date() }).where(eq(usersTable.id, userId)).returning();
@@ -58,7 +58,7 @@ router.patch("/users/:userId/role", requireAdmin, async (req: AuthRequest, res) 
 // Ban permanently
 router.post("/users/:userId/ban", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(String(req.params.userId));
     const { reason, banDevice } = req.body;
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
@@ -77,7 +77,7 @@ router.post("/users/:userId/ban", requireAdmin, async (req: AuthRequest, res) =>
 // Unban
 router.post("/users/:userId/unban", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(String(req.params.userId));
     const [updated] = await db.update(usersTable).set({ bannedPermanently: false, bannedReason: null, status: "approved" as any, updatedAt: new Date() }).where(eq(usersTable.id, userId)).returning();
     if (!updated) { res.status(404).json({ error: "User not found" }); return; }
     await db.insert(notificationsTable).values({ userId, title: "Account Reinstated", message: "Your account ban has been lifted. Welcome back!", type: "account_update", isRead: false });
@@ -89,7 +89,7 @@ router.post("/users/:userId/unban", requireAdmin, async (req: AuthRequest, res) 
 // Suspend for N days
 router.post("/users/:userId/suspend", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(String(req.params.userId));
     const { days, reason } = req.body;
     if (!days || days < 1) { res.status(400).json({ error: "Days must be >= 1" }); return; }
     const suspendedUntil = new Date(Date.now() + days * 24 * 3600 * 1000);
@@ -104,7 +104,7 @@ router.post("/users/:userId/suspend", requireAdmin, async (req: AuthRequest, res
 // Unsuspend
 router.post("/users/:userId/unsuspend", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(String(req.params.userId));
     const [updated] = await db.update(usersTable).set({ suspendedUntil: null, suspensionReason: null, updatedAt: new Date() }).where(eq(usersTable.id, userId)).returning();
     if (!updated) { res.status(404).json({ error: "User not found" }); return; }
     await db.insert(notificationsTable).values({ userId, title: "Suspension Lifted", message: "Your account suspension has been removed.", type: "account_update", isRead: false });
@@ -116,7 +116,7 @@ router.post("/users/:userId/unsuspend", requireAdmin, async (req: AuthRequest, r
 // Add coins to user
 router.post("/users/:userId/add-coins", requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const userId = parseInt(req.params.userId);
+    const userId = parseInt(String(req.params.userId));
     const { coins, reason } = req.body;
     if (!coins || isNaN(parseInt(coins))) { res.status(400).json({ error: "Coin amount required" }); return; }
     const amount = parseInt(coins);
