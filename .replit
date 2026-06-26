@@ -65,7 +65,7 @@ args = "PORT=5173 BASE_PATH=/user-app/ cd artifacts/user-app && PORT=5173 BASE_P
 waitForPort = 5173
 
 [agent]
-stack = "PNPM_WORKSPACE"
+stack = "BEST_EFFORT_FALLBACK"
 expertMode = true
 
 [postMerge]
