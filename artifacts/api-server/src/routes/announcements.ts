@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { announcementsTable } from "@workspace/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { requireAdmin, type AuthRequest } from "../lib/middleware";
+import { broadcastToAll } from "../lib/websocket";
 
 const router = Router();
 
@@ -22,6 +23,7 @@ router.post("/announcements", requireAdmin, async (req: AuthRequest, res) => {
     const { text } = req.body;
     if (!text?.trim()) { res.status(400).json({ error: "Announcement text is required" }); return; }
     const [a] = await db.insert(announcementsTable).values({ text: text.trim() }).returning();
+    broadcastToAll("announcement_updated", {});
     res.status(201).json(a);
   } catch {
     res.status(500).json({ error: "Failed to create announcement" });
@@ -42,6 +44,7 @@ router.patch("/announcements/:id", requireAdmin, async (req: AuthRequest, res) =
       updatedAt: new Date(),
     }).where(eq(announcementsTable.id, id)).returning();
 
+    broadcastToAll("announcement_updated", {});
     res.json(updated);
   } catch {
     res.status(500).json({ error: "Failed to update announcement" });
@@ -53,6 +56,7 @@ router.delete("/announcements/:id", requireAdmin, async (req: AuthRequest, res) 
   try {
     const [del] = await db.delete(announcementsTable).where(eq(announcementsTable.id, parseInt(req.params.id))).returning();
     if (!del) { res.status(404).json({ error: "Announcement not found" }); return; }
+    broadcastToAll("announcement_updated", {});
     res.json({ success: true });
   } catch {
     res.status(500).json({ error: "Failed to delete announcement" });

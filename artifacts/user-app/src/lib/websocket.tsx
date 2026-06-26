@@ -74,6 +74,9 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
               toast({ title: "Ticket Update", description: `Your ticket is now ${data.status}.` });
               queryClient.invalidateQueries({ queryKey: ["tickets"] });
               break;
+            case "announcement_updated":
+              queryClient.invalidateQueries({ queryKey: ["announcements"] });
+              break;
           }
         } catch {}
       };

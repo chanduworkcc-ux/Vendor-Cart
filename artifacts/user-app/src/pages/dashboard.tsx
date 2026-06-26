@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { useListOrders, useListNotifications, useGetAdminSettings } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, Truck, CheckCircle, Bell, AlertTriangle } from "lucide-react";
+import { Package, Truck, CheckCircle, Bell, AlertTriangle, Megaphone, X } from "lucide-react";
 import { format } from "date-fns";
 import { Link } from "wouter";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 function WelcomeBanner({ name }: { name: string }) {
   const hour = new Date().getHours();
