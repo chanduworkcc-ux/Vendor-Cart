@@ -9,6 +9,7 @@ import ticketsRouter from "./tickets";
 import profileRouter from "./profile";
 import referralsRouter from "./referrals";
 import withdrawalsRouter from "./withdrawals";
+import couponsRouter from "./coupons";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(ticketsRouter);
 router.use(profileRouter);
 router.use(referralsRouter);
 router.use(withdrawalsRouter);
+router.use(couponsRouter);
 
 export default router;

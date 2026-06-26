@@ -13,6 +13,9 @@ export const adminSettingsTable = pgTable("admin_settings", {
   referralEnabled: boolean("referral_enabled").notNull().default(true),
   maxLoginAttempts: integer("max_login_attempts").notNull().default(5),
   lockDurationMinutes: integer("lock_duration_minutes").notNull().default(30),
+  loginEnabled: boolean("login_enabled").notNull().default(true),
+  signupEnabled: boolean("signup_enabled").notNull().default(true),
+  autoApproveRegistrations: boolean("auto_approve_registrations").notNull().default(false),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

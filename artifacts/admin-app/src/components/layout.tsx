@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useListUsers, useListOrders } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
-import { LayoutDashboard, Users, Package, Bell, Settings, LogOut, Menu, MessageSquare, Wifi, Activity, Gift, Wallet, BarChart3, Shield } from "lucide-react";
+import { LayoutDashboard, Users, Package, Bell, Settings, LogOut, Menu, MessageSquare, Wifi, Activity, Gift, Wallet, BarChart3, Shield, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +49,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/tickets", label: "Support Tickets", icon: MessageSquare, badge: openTickets },
     { href: "/referrals", label: "Referrals", icon: Gift },
     { href: "/withdrawals", label: "Withdrawals", icon: Wallet, badge: pendingWithdrawals },
+    { href: "/coupons", label: "Coupons", icon: Tag },
     { href: "/activity-logs", label: "Activity Logs", icon: Activity },
     { href: "/security", label: "Security", icon: Shield },
     { href: "/notifications", label: "Notifications", icon: Bell },

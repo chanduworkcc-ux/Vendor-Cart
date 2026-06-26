@@ -7,3 +7,4 @@ export * from "./activityLogs";
 export * from "./referrals";
 export * from "./withdrawals";
 export * from "./blockedIps";
+export * from "./coupons";

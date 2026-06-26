@@ -27,6 +27,9 @@ router.get("/admin/settings", requireAdmin, async (_req, res) => {
       referralEnabled: settings.referralEnabled,
       maxLoginAttempts: settings.maxLoginAttempts,
       lockDurationMinutes: settings.lockDurationMinutes,
+      loginEnabled: settings.loginEnabled,
+      signupEnabled: settings.signupEnabled,
+      autoApproveRegistrations: settings.autoApproveRegistrations,
       updatedAt: settings.updatedAt.toISOString(),
     });
   } catch { res.status(500).json({ error: "Failed to get settings" }); }
@@ -39,6 +42,7 @@ router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
       acceptingOrders, maintenanceMode, orderCooldownMinutes,
       coinsPerReferral, minWithdrawalCoins, coinsPerRupee,
       referralEnabled, maxLoginAttempts, lockDurationMinutes,
+      loginEnabled, signupEnabled, autoApproveRegistrations,
     } = req.body;
 
     const [updated] = await db.update(adminSettingsTable).set({
@@ -51,6 +55,9 @@ router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
       referralEnabled: referralEnabled !== undefined ? referralEnabled : settings.referralEnabled,
       maxLoginAttempts: maxLoginAttempts !== undefined ? parseInt(maxLoginAttempts) : settings.maxLoginAttempts,
       lockDurationMinutes: lockDurationMinutes !== undefined ? parseInt(lockDurationMinutes) : settings.lockDurationMinutes,
+      loginEnabled: loginEnabled !== undefined ? loginEnabled : settings.loginEnabled,
+      signupEnabled: signupEnabled !== undefined ? signupEnabled : settings.signupEnabled,
+      autoApproveRegistrations: autoApproveRegistrations !== undefined ? autoApproveRegistrations : settings.autoApproveRegistrations,
       updatedAt: new Date(),
     }).where(eq(adminSettingsTable.id, settings.id)).returning();
 
@@ -58,6 +65,8 @@ router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
       acceptingOrders: updated.acceptingOrders,
       maintenanceMode: updated.maintenanceMode,
       referralEnabled: updated.referralEnabled,
+      loginEnabled: updated.loginEnabled,
+      signupEnabled: updated.signupEnabled,
     });
 
     res.json({
@@ -70,6 +79,9 @@ router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
       referralEnabled: updated.referralEnabled,
       maxLoginAttempts: updated.maxLoginAttempts,
       lockDurationMinutes: updated.lockDurationMinutes,
+      loginEnabled: updated.loginEnabled,
+      signupEnabled: updated.signupEnabled,
+      autoApproveRegistrations: updated.autoApproveRegistrations,
       updatedAt: updated.updatedAt.toISOString(),
     });
   } catch { res.status(500).json({ error: "Failed to update settings" }); }
