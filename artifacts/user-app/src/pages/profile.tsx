@@ -14,7 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { User, Lock, Globe, Palette, HelpCircle, Loader2, CheckCircle, Phone, MapPin, Wallet } from "lucide-react";
 import { Link } from "wouter";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 const LANGUAGES = [
   { code: "en", label: "English" },

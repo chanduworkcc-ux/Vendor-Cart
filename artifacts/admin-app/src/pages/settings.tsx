@@ -15,7 +15,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 interface Announcement { id: number; text: string; isActive: boolean; createdAt: string; }
 

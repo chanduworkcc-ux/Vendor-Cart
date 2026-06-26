@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Gift, Users, Loader2, Coins } from "lucide-react";
 import { format } from "date-fns";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 export default function Referrals() {
   const { token } = useAuth();

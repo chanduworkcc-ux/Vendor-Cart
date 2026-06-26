@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Mail, User, Phone, MessageSquare, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
 
-const BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") ?? "";
+const BASE = "";
 
 export default function Register() {
   const [, setLocation] = useLocation();

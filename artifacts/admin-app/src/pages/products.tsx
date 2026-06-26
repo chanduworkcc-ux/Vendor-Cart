@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Package, Plus, Pencil, Trash2, Loader2, ImagePlus, X, Tag, Search, FolderPlus } from "lucide-react";
 import { format } from "date-fns";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 const STATUS_COLORS: Record<string, string> = {
   active: "bg-green-100 text-green-800",

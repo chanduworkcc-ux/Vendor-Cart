@@ -2,13 +2,13 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useListNotifications } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
-import { Package, LayoutDashboard, Bell, LogOut, Menu, User, MessageSquare, Gift, Wallet } from "lucide-react";
+import { Package, LayoutDashboard, Bell, LogOut, Menu, User, MessageSquare, Gift, Wallet, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
@@ -35,6 +35,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: "/", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/shop", label: "Shop", icon: ShoppingBag },
     { href: "/orders", label: "My Orders", icon: Package },
     { href: "/referral", label: "Referral & Coins", icon: Gift },
     { href: "/wallet", label: "Token Wallet", icon: Wallet },

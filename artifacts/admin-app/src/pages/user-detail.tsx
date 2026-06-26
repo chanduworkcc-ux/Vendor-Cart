@@ -15,7 +15,7 @@ import { format } from "date-fns";
 import { ArrowLeft, Loader2, UserCheck, UserX, Ban, Clock, Coins, Shield, Globe, Smartphone, AlertTriangle } from "lucide-react";
 import { Link } from "wouter";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 export default function UserDetail() {
   const { id } = useParams<{ id: string }>();

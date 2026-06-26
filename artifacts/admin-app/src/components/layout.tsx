@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();

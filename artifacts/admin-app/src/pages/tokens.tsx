@@ -13,7 +13,7 @@ import { Loader2, Plus, Coins, Send, Trash2, Minus } from "lucide-react";
 import { format } from "date-fns";
 import { useListUsers } from "@workspace/api-client-react";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 export default function Tokens() {
   const { token } = useAuth();

@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Gift, Copy, Loader2, Wallet, IndianRupee, CheckCircle, Share2, Users, Clock, CircleCheck, RefreshCw, Banknote, CircleDot } from "lucide-react";
 import { format } from "date-fns";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 export default function Referral() {
   const { user } = useAuth();

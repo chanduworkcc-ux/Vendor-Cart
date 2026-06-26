@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Plus, Trash2, Pencil, Tag, Gift, Check, X } from "lucide-react";
 import { format } from "date-fns";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 const TYPE_LABELS: Record<string, { label: string; color: string; desc: string }> = {
   public:       { label: "Public", color: "bg-blue-100 text-blue-800", desc: "All users can see & use" },

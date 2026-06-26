@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Wallet, Loader2, IndianRupee, Lock } from "lucide-react";
 import { format } from "date-fns";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
   created:    { label: "Pending",    color: "bg-blue-100 text-blue-800 border-blue-200",     icon: "🕐" },

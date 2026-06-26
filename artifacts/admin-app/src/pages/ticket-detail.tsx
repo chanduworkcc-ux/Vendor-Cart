@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ArrowLeft, Send, Loader2, MessageSquare, User } from "lucide-react";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 const token = () => localStorage.getItem("admin_token");
 
 async function apiFetch(path: string, opts: RequestInit = {}) {

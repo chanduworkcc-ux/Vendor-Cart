@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Plus, MessageSquare, Loader2, AlertCircle, Clock, CheckCircle } from "lucide-react";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 const token = () => localStorage.getItem("token");
 
 async function apiFetch(path: string, opts: RequestInit = {}) {

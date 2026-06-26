@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { BarChart3, TrendingUp, Package, Users, Gift, Wallet, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 export default function Analytics() {
   const { token } = useAuth();

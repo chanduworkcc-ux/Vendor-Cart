@@ -9,7 +9,7 @@ import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 const ACTION_BADGES: Record<string, { label: string; color: string }> = {
   login_success:       { label: "Login", color: "bg-green-100 text-green-800" },

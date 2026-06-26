@@ -6,7 +6,7 @@ import { Loader2, Wallet, ArrowUpRight, ArrowDownLeft } from "lucide-react";
 import { format } from "date-fns";
 import { motion } from "framer-motion";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 function TokenCard({ token, index }: { token: any; index: number }) {
   return (

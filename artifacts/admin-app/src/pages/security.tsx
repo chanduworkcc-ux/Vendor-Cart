@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Shield, AlertTriangle, Ban, Unlock, Loader2, Globe, Smartphone, Lock, Eye } from "lucide-react";
 import { format } from "date-fns";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 export default function Security() {
   const { token } = useAuth();

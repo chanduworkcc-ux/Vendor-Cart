@@ -6,7 +6,7 @@ import { Link } from "wouter";
 import { format } from "date-fns";
 import { useAuth } from "@/lib/auth";
 
-const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const BASE = "";
 
 export default function Dashboard() {
   const { token } = useAuth();

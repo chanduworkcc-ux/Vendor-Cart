@@ -14,6 +14,7 @@ import VerifyEmail from "@/pages/verify-email";
 import Pending from "@/pages/pending";
 import Suspended from "@/pages/suspended";
 import Dashboard from "@/pages/dashboard";
+import Shop from "@/pages/shop";
 import Orders from "@/pages/orders";
 import OrderDetail from "@/pages/order-detail";
 import Notifications from "@/pages/notifications";
@@ -55,6 +56,14 @@ function Router() {
         <ProtectedRoute>
           <Layout>
             <Dashboard />
+          </Layout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/shop">
+        <ProtectedRoute>
+          <Layout>
+            <Shop />
           </Layout>
         </ProtectedRoute>
       </Route>
