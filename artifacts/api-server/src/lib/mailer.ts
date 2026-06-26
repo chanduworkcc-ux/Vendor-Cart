@@ -2,7 +2,7 @@ import nodemailer from "nodemailer";
 
 function createTransport() {
   const host = process.env.SMTP_HOST;
-  const port = parseInt(process.env.SMTP_PORT || "587");
+  const port = parseInt(process.env.SMTP_PORT || "465");
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
 
@@ -15,11 +15,8 @@ function createTransport() {
     });
   }
 
-  // Fallback: use Ethereal (test account) in dev
   return null;
 }
-
-const transport = createTransport();
 
 export async function sendOtpEmail(to: string, name: string, otp: string): Promise<{ sent: boolean; preview?: string }> {
   const subject = "Your Verification Code";
@@ -35,10 +32,13 @@ export async function sendOtpEmail(to: string, name: string, otp: string): Promi
     </div>
   `;
 
+  const transport = createTransport();
+
   if (transport) {
     try {
-      const from = process.env.SMTP_FROM || process.env.SMTP_USER || "noreply@shopall.com";
+      const from = process.env.SMTP_FROM || process.env.SMTP_USER || "noreply@example.com";
       await transport.sendMail({ from, to, subject, html });
+      console.log(`[mailer] OTP sent to ${to}`);
       return { sent: true };
     } catch (err) {
       console.error("[mailer] Failed to send email:", err);
@@ -46,7 +46,7 @@ export async function sendOtpEmail(to: string, name: string, otp: string): Promi
     }
   }
 
-  // Dev fallback — log to console
+  // Dev fallback — log OTP to console
   console.log(`\n[MAILER DEV] OTP for ${to}: ${otp}\n`);
   return { sent: false, preview: otp };
 }
