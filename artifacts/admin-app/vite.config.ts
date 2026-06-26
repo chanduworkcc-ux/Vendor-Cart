@@ -11,6 +11,19 @@ const basePath = process.env.BASE_PATH ?? "/admin-app/";
 export default defineConfig({
   base: basePath,
   plugins: [
+    {
+      name: "root-redirect",
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (req.url === "/" || req.url === "") {
+            res.writeHead(302, { Location: basePath });
+            res.end();
+            return;
+          }
+          next();
+        });
+      },
+    },
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
