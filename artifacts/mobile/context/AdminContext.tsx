@@ -38,9 +38,9 @@ export interface StoreSettings {
 }
 
 const DEFAULT_SETTINGS: StoreSettings = {
-  storeName: 'ShopAll',
-  tagline: 'Your one-stop general store',
-  email: 'hello@shopall.com',
+  storeName: 'XyloCart',
+  tagline: 'Shop smarter, faster',
+  email: 'hello@xylocart.com',
   phone: '+91 1800 555 0100',
   address: 'Hyderabad, Telangana, India',
   currency: 'INR',

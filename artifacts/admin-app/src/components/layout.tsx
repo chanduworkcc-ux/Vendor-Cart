@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
+import { motion } from "framer-motion";
 
 const BASE = "";
 
@@ -61,27 +62,33 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const NavLinks = () => (
     <>
       <div className="flex-1 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
+        {navItems.map((item, i) => {
           const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
           return (
-            <Link
+            <motion.div
               key={item.href}
-              href={item.href}
-              className={`flex items-center w-full justify-start rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-secondary text-secondary-foreground"
-                  : "hover:bg-accent hover:text-accent-foreground text-foreground"
-              }`}
-              onClick={() => setOpen(false)}
+              initial={{ opacity: 0, x: -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.04, duration: 0.28 }}
             >
-              <item.icon className="mr-3 h-4 w-4 shrink-0" />
-              {item.label}
-              {item.badge != null && item.badge > 0 && (
-                <Badge variant="destructive" className="ml-auto flex h-5 w-5 items-center justify-center rounded-full p-0 text-xs">
-                  {item.badge}
-                </Badge>
-              )}
-            </Link>
+              <Link
+                href={item.href}
+                className={`flex items-center w-full justify-start rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-secondary text-secondary-foreground"
+                    : "hover:bg-accent hover:text-accent-foreground text-foreground"
+                }`}
+                onClick={() => setOpen(false)}
+              >
+                <item.icon className="mr-3 h-4 w-4 shrink-0" />
+                {item.label}
+                {item.badge != null && item.badge > 0 && (
+                  <Badge variant="destructive" className="ml-auto flex h-5 w-5 items-center justify-center rounded-full p-0 text-xs">
+                    {item.badge}
+                  </Badge>
+                )}
+              </Link>
+            </motion.div>
           );
         })}
       </div>
@@ -101,10 +108,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
     </>
   );
 
+  const LogoMark = ({ compact = false }) => (
+    <div className="flex items-center gap-2 select-none">
+      <div className="xylo-logo-bounce" style={{ display: 'inline-block' }}>
+        <img
+          src="/xylocart-logo.png"
+          alt="XyloCart"
+          className={`object-contain drop-shadow-md ${compact ? "h-8 w-8" : "h-9 w-9"}`}
+          style={{ filter: 'drop-shadow(0 4px 10px rgba(59,130,246,0.35))' }}
+        />
+      </div>
+      <div>
+        <div className={`xylo-shimmer font-extrabold leading-tight tracking-tight ${compact ? "text-lg" : "text-xl"}`}>XyloCart</div>
+        <div className="text-[10px] text-muted-foreground leading-none mt-0.5">Admin Console</div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="hidden w-60 flex-col border-r bg-card p-3 md:flex">
-        <div className="mb-6 px-2 text-2xl font-bold tracking-tight text-primary">Admin Panel</div>
+        <div className="mb-5 px-1 pt-1">
+          <LogoMark />
+        </div>
         <NavLinks />
       </aside>
       <div className="flex flex-1 flex-col">
@@ -116,14 +142,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-60 p-3 pt-12 flex flex-col">
-              <div className="mb-6 px-2 text-2xl font-bold tracking-tight text-primary">Admin Panel</div>
+              <div className="mb-5 px-1">
+                <LogoMark />
+              </div>
               <NavLinks />
             </SheetContent>
           </Sheet>
-          <div className="text-xl font-bold tracking-tight text-primary">Admin Panel</div>
+          <LogoMark compact />
         </header>
         <main className="flex-1 overflow-auto p-4 md:p-8">
-          <div className="mx-auto max-w-6xl">{children}</div>
+          <motion.div
+            className="mx-auto max-w-6xl"
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+          >
+            {children}
+          </motion.div>
         </main>
       </div>
     </div>

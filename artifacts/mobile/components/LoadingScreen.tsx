@@ -76,7 +76,7 @@ export function LoadingScreen() {
       <Animated.View style={[styles.core, { transform: [{ scale }] }]}>
         <View style={styles.coreInner} />
       </Animated.View>
-      <Text style={styles.label}>ShopAll</Text>
+      <Text style={styles.label}>XyloCart</Text>
     </Animated.View>
   );
 }

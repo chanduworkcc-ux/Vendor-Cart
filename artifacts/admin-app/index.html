@@ -3,19 +3,44 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>Admin Dashboard</title>
-    <meta name="description" content="Admin Dashboard — built on Replit. Update this description to reflect the app." />
-    <meta name="robots" content="index, follow" />
-    <meta property="og:title" content="Admin Dashboard" />
-    <meta property="og:description" content="Admin Dashboard — built on Replit. Update this description to reflect the app." />
+    <title>XyloCart Admin</title>
+    <meta name="description" content="XyloCart Admin — Manage your store, products, orders, and users." />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta property="og:title" content="XyloCart Admin" />
+    <meta property="og:description" content="XyloCart Admin — Manage your store." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Admin Dashboard" />
-    <meta name="twitter:description" content="Admin Dashboard — built on Replit. Update this description to reflect the app." />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="twitter:title" content="XyloCart Admin" />
+    <meta name="twitter:description" content="XyloCart Admin — Manage your store." />
+    <link rel="icon" type="image/png" href="/xylocart-logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      @keyframes float {
+        0%, 100% { transform: translateY(0px) rotate(0deg); }
+        33% { transform: translateY(-14px) rotate(1deg); }
+        66% { transform: translateY(-7px) rotate(-0.8deg); }
+      }
+      @keyframes logo-bounce {
+        0%, 100% { transform: perspective(600px) rotateX(0deg) translateY(0px); }
+        50% { transform: perspective(600px) rotateX(6deg) translateY(-5px); }
+      }
+      @keyframes shimmer {
+        0% { background-position: -200% center; }
+        100% { background-position: 200% center; }
+      }
+      .xylo-float { animation: float 5s ease-in-out infinite; }
+      .xylo-logo-bounce { animation: logo-bounce 3.5s ease-in-out infinite; }
+      .xylo-shimmer {
+        background: linear-gradient(90deg, #1d4ed8, #3b82f6, #f97316, #3b82f6, #1d4ed8);
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        animation: shimmer 4s linear infinite;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

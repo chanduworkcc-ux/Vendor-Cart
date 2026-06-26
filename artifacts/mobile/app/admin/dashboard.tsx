@@ -136,7 +136,7 @@ export default function AdminDashboard() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPadding + 16, backgroundColor: colors.primary }]}>
         <View>
-          <Text style={styles.headerSub}>Admin Dashboard</Text>
+          <Text style={styles.headerSub}>XyloCart Admin</Text>
           <Text style={styles.headerTitle}>{storeSettings.storeName}</Text>
         </View>
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>

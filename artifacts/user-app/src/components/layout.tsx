@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
 
 const BASE = "";
 
@@ -47,27 +48,33 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const NavLinks = ({ onClose }: { onClose?: () => void }) => (
     <>
       <div className="flex-1 space-y-1">
-        {navItems.map((item) => {
+        {navItems.map((item, i) => {
           const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
           return (
-            <Link
+            <motion.div
               key={item.href}
-              href={item.href}
-              className={`flex items-center w-full justify-start rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
-                isActive
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "hover:bg-accent hover:text-accent-foreground text-foreground"
-              }`}
-              onClick={onClose}
+              initial={{ opacity: 0, x: -16 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.05, duration: 0.3 }}
             >
-              <item.icon className="mr-3 h-4 w-4 shrink-0" />
-              {item.label}
-              {(item as any).badge > 0 && (
-                <Badge variant="destructive" className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full p-0 text-xs">
-                  {(item as any).badge}
-                </Badge>
-              )}
-            </Link>
+              <Link
+                href={item.href}
+                className={`flex items-center w-full justify-start rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "hover:bg-accent hover:text-accent-foreground text-foreground"
+                }`}
+                onClick={onClose}
+              >
+                <item.icon className="mr-3 h-4 w-4 shrink-0" />
+                {item.label}
+                {(item as any).badge > 0 && (
+                  <Badge variant="destructive" className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full p-0 text-xs">
+                    {(item as any).badge}
+                  </Badge>
+                )}
+              </Link>
+            </motion.div>
           );
         })}
       </div>
@@ -91,12 +98,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
     </>
   );
 
+  const LogoMark = () => (
+    <div className="flex items-center gap-2.5 select-none">
+      <div className="xylo-logo-bounce" style={{ display: 'inline-block' }}>
+        <img
+          src="/xylocart-logo.png"
+          alt="XyloCart"
+          className="h-9 w-9 object-contain drop-shadow-md"
+          style={{ filter: 'drop-shadow(0 4px 12px rgba(59,130,246,0.35))' }}
+        />
+      </div>
+      <div>
+        <div className="xylo-shimmer text-xl font-extrabold leading-tight tracking-tight">XyloCart</div>
+        <div className="text-[10px] text-muted-foreground leading-none mt-0.5">Customer Portal</div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex min-h-screen bg-background">
       <aside className="hidden w-64 flex-col border-r bg-card p-4 md:flex">
-        <div className="mb-6 px-4">
-          <div className="text-2xl font-bold tracking-tight text-primary">Portal</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Customer Platform</div>
+        <div className="mb-6 px-2">
+          <LogoMark />
         </div>
         <NavLinks />
       </aside>
@@ -111,13 +134,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-64 p-4 pt-10 flex flex-col">
-                <div className="mb-6 px-4">
-                  <div className="text-2xl font-bold tracking-tight text-primary">Portal</div>
+                <div className="mb-6 px-2">
+                  <LogoMark />
                 </div>
                 <NavLinks onClose={() => setIsMobileMenuOpen(false)} />
               </SheetContent>
             </Sheet>
-            <div className="font-semibold text-primary md:hidden">Portal</div>
+            <div className="md:hidden">
+              <span className="xylo-shimmer text-lg font-extrabold">XyloCart</span>
+            </div>
           </div>
           <div className="hidden md:flex items-center gap-2 text-sm">
             <span className="text-muted-foreground">Welcome back,</span>
@@ -145,9 +170,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 overflow-auto p-4 md:p-8">
-          <div className="mx-auto max-w-5xl">
+          <motion.div
+            className="mx-auto max-w-5xl"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+          >
             {children}
-          </div>
+          </motion.div>
         </main>
       </div>
     </div>

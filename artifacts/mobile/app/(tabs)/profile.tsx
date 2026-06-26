@@ -454,11 +454,11 @@ function RateModal({ visible, onClose }: { visible: boolean; onClose: () => void
   };
 
   return (
-    <ModalShell visible={visible} title="Rate ShopAll" onClose={onClose}>
+    <ModalShell visible={visible} title="Rate XyloCart" onClose={onClose}>
       <View style={styles.ratingCenter}>
         <Text style={[styles.ratingEmoji]}>{'⭐'.repeat(Math.max(rating, 1))}</Text>
         <Text style={[styles.ratingPrompt, { color: colors.foreground }]}>
-          {rating === 0 ? 'How would you rate ShopAll?' : rating === 5 ? 'You\'re amazing! 🎉' : rating >= 4 ? 'Great, thanks!' : rating >= 3 ? 'We\'ll improve!' : 'Sorry to hear that!'}
+          {rating === 0 ? 'How would you rate XyloCart?' : rating === 5 ? 'You\'re amazing! 🎉' : rating >= 4 ? 'Great, thanks!' : rating >= 3 ? 'We\'ll improve!' : 'Sorry to hear that!'}
         </Text>
         <View style={styles.stars}>
           {[1, 2, 3, 4, 5].map((s) => (
