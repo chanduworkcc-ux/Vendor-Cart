@@ -8,17 +8,70 @@ import { getOnlineUserIds } from "../lib/websocket";
 
 const router = Router();
 
-// Update profile (name, language, theme, phone, address, upiId)
+function sanitize(input: string | undefined | null): string | null {
+  if (input === undefined || input === null) return null;
+  return input
+    .replace(/<[^>]*>/g, "")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/javascript:/gi, "")
+    .replace(/on\w+\s*=/gi, "")
+    .trim();
+}
+
+function sanitizeUrl(url: string | undefined | null): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (trimmed === "") return null;
+  if (!/^https?:\/\//i.test(trimmed)) return null;
+  return trimmed;
+}
+
+// Update profile (name, language, theme, phone, address, upiId, bio, avatarUrl, bannerUrl, whatsappNumber)
 router.patch("/profile", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const { name, language, theme, phone, address, upiId } = req.body;
+    const { name, language, theme, phone, address, upiId, bio, avatarUrl, bannerUrl, whatsappNumber } = req.body;
     const updates: any = { updatedAt: new Date() };
-    if (name !== undefined) updates.name = name;
-    if (language !== undefined) updates.language = language;
-    if (theme !== undefined) updates.theme = theme;
-    if (phone !== undefined) updates.phone = phone || null;
-    if (address !== undefined) updates.address = address || null;
-    if (upiId !== undefined) updates.upiId = upiId || null;
+
+    if (name !== undefined) {
+      const cleanName = sanitize(name);
+      if (!cleanName || cleanName.length < 1) { res.status(400).json({ error: "Name cannot be empty" }); return; }
+      if (cleanName.length > 100) { res.status(400).json({ error: "Name too long (max 100 characters)" }); return; }
+      updates.name = cleanName;
+    }
+    if (language !== undefined) updates.language = language || "en";
+    if (theme !== undefined) updates.theme = theme || "light";
+    if (phone !== undefined) {
+      const cleanPhone = sanitize(phone);
+      if (cleanPhone && !/^[+\d\s\-().]{7,20}$/.test(cleanPhone)) { res.status(400).json({ error: "Invalid phone number format" }); return; }
+      updates.phone = cleanPhone || null;
+    }
+    if (address !== undefined) {
+      const cleanAddress = sanitize(address);
+      if (cleanAddress && cleanAddress.length > 300) { res.status(400).json({ error: "Address too long (max 300 characters)" }); return; }
+      updates.address = cleanAddress || null;
+    }
+    if (upiId !== undefined) {
+      const cleanUpi = sanitize(upiId);
+      updates.upiId = cleanUpi || null;
+    }
+    if (bio !== undefined) {
+      const cleanBio = sanitize(bio);
+      if (cleanBio && cleanBio.length > 500) { res.status(400).json({ error: "Bio too long (max 500 characters)" }); return; }
+      updates.bio = cleanBio || null;
+    }
+    if (avatarUrl !== undefined) {
+      updates.avatarUrl = sanitizeUrl(avatarUrl);
+    }
+    if (bannerUrl !== undefined) {
+      updates.bannerUrl = sanitizeUrl(bannerUrl);
+    }
+    if (whatsappNumber !== undefined) {
+      const cleanWa = sanitize(whatsappNumber);
+      if (cleanWa && !/^[+\d\s\-().]{7,20}$/.test(cleanWa)) { res.status(400).json({ error: "Invalid WhatsApp number format" }); return; }
+      updates.whatsappNumber = cleanWa || null;
+    }
 
     const [updated] = await db.update(usersTable).set(updates).where(eq(usersTable.id, req.userId!)).returning();
     res.json(formatUser(updated));
@@ -30,6 +83,8 @@ router.patch("/profile/password", requireAuth, async (req: AuthRequest, res) => 
   try {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) { res.status(400).json({ error: "Both passwords required" }); return; }
+    if (typeof newPassword !== "string" || newPassword.length < 6) { res.status(400).json({ error: "New password must be at least 6 characters" }); return; }
+    if (newPassword.length > 128) { res.status(400).json({ error: "Password too long" }); return; }
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.userId!)).limit(1);
     if (!user) { res.status(404).json({ error: "User not found" }); return; }
     const valid = await comparePassword(currentPassword, user.passwordHash);
@@ -81,6 +136,8 @@ function formatUser(user: typeof usersTable.$inferSelect) {
     language: user.language, theme: user.theme,
     isOnline: user.isOnline, lastSeen: user.lastSeen?.toISOString() ?? null,
     phone: user.phone, address: user.address, upiId: user.upiId,
+    whatsappNumber: user.whatsappNumber,
+    bio: user.bio, avatarUrl: user.avatarUrl, bannerUrl: user.bannerUrl,
     coinBalance: user.coinBalance, referralCode: user.referralCode,
     createdAt: user.createdAt.toISOString(),
   };

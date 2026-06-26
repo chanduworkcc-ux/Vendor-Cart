@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -7,11 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
-import { User, Lock, Globe, Palette, HelpCircle, Loader2, CheckCircle, Phone, MapPin, Wallet } from "lucide-react";
+import { User, Lock, Globe, Palette, HelpCircle, Loader2, CheckCircle, Phone, MapPin, Wallet, MessageCircle, Image as ImageIcon, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 
 const BASE = "";
@@ -42,6 +43,43 @@ const THEMES = [
   { value: "system", label: "System Default" },
 ];
 
+function AvatarPreview({ url, name }: { url: string; name: string }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [url]);
+  if (url && !broken) {
+    return (
+      <img
+        src={url}
+        alt={name}
+        className="w-16 h-16 rounded-full object-cover border-2 border-primary/20"
+        onError={() => setBroken(true)}
+      />
+    );
+  }
+  return (
+    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary border-2 border-primary/20">
+      {name?.[0]?.toUpperCase() ?? "?"}
+    </div>
+  );
+}
+
+function BannerPreview({ url }: { url: string }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => setBroken(false), [url]);
+  if (url && !broken) {
+    return (
+      <div className="w-full h-24 rounded-lg overflow-hidden border">
+        <img src={url} alt="Profile banner" className="w-full h-full object-cover" onError={() => setBroken(true)} />
+      </div>
+    );
+  }
+  return (
+    <div className="w-full h-24 rounded-lg border border-dashed flex items-center justify-center text-muted-foreground bg-muted/30">
+      <ImageIcon className="h-6 w-6 mr-2" /> No banner set
+    </div>
+  );
+}
+
 export default function Profile() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
@@ -53,6 +91,10 @@ export default function Profile() {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [upiId, setUpiId] = useState("");
+  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [bannerUrl, setBannerUrl] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -67,16 +109,23 @@ export default function Profile() {
       setPhone((user as any).phone || "");
       setAddress((user as any).address || "");
       setUpiId((user as any).upiId || "");
+      setWhatsappNumber((user as any).whatsappNumber || "");
+      setBio((user as any).bio || "");
+      setAvatarUrl((user as any).avatarUrl || "");
+      setBannerUrl((user as any).bannerUrl || "");
     }
   }, [user]);
 
+  const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}` });
+
   const saveProfile = async () => {
+    if (!name.trim()) { toast({ title: "Name cannot be empty", variant: "destructive" }); return; }
     setSaving(true);
     try {
       const res = await fetch(`${BASE}/api/profile`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
-        body: JSON.stringify({ name, language, theme, phone, address, upiId }),
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ name, language, theme, phone, address, upiId, whatsappNumber, bio, avatarUrl, bannerUrl }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
       queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
@@ -91,7 +140,7 @@ export default function Profile() {
     try {
       const res = await fetch(`${BASE}/api/profile`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({ theme: newTheme }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
@@ -109,7 +158,7 @@ export default function Profile() {
     try {
       const res = await fetch(`${BASE}/api/profile/password`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token")}` },
+        headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({ currentPassword, newPassword }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
@@ -140,14 +189,18 @@ export default function Profile() {
           <Card>
             <CardHeader>
               <CardTitle>Account Information</CardTitle>
-              <CardDescription>Update your name, contact info, and preferences.</CardDescription>
+              <CardDescription>Update your profile, contact info, and preferences.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary">
-                  {user?.name?.[0]?.toUpperCase()}
+              {/* Profile header with avatar and banner */}
+              <div className="space-y-3">
+                <div className="relative">
+                  <BannerPreview url={bannerUrl} />
+                  <div className="absolute -bottom-6 left-4">
+                    <AvatarPreview url={avatarUrl} name={name || user?.name || ""} />
+                  </div>
                 </div>
-                <div>
+                <div className="pt-8 pb-1">
                   <p className="font-semibold text-lg">{user?.name}</p>
                   <p className="text-sm text-muted-foreground">{user?.email}</p>
                   <div className="flex gap-2 mt-1">
@@ -159,30 +212,93 @@ export default function Profile() {
                   )}
                 </div>
               </div>
+
               <Separator />
+
               <div className="space-y-4 max-w-md">
+                {/* Avatar URL */}
+                <div>
+                  <Label htmlFor="avatarUrl" className="flex items-center gap-1"><ImageIcon className="h-3 w-3" /> Profile Picture URL</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input id="avatarUrl" value={avatarUrl} onChange={e => setAvatarUrl(e.target.value)} placeholder="https://example.com/avatar.jpg" />
+                    {avatarUrl && (
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setAvatarUrl("")} title="Clear">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Must be a public https:// image URL.</p>
+                </div>
+
+                {/* Banner URL */}
+                <div>
+                  <Label htmlFor="bannerUrl" className="flex items-center gap-1"><ImageIcon className="h-3 w-3" /> Banner Image URL</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input id="bannerUrl" value={bannerUrl} onChange={e => setBannerUrl(e.target.value)} placeholder="https://example.com/banner.jpg" />
+                    {bannerUrl && (
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setBannerUrl("")} title="Clear">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bio */}
+                <div>
+                  <Label htmlFor="bio">Bio</Label>
+                  <Textarea
+                    id="bio"
+                    value={bio}
+                    onChange={e => setBio(e.target.value)}
+                    placeholder="Tell us a bit about yourself..."
+                    className="mt-1 resize-none"
+                    rows={3}
+                    maxLength={500}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">{bio.length}/500 characters</p>
+                </div>
+
+                <Separator />
+
+                {/* Full Name */}
                 <div>
                   <Label htmlFor="name">Full Name</Label>
                   <Input id="name" value={name} onChange={e => setName(e.target.value)} className="mt-1" />
                 </div>
+
+                {/* Email (read-only) */}
                 <div>
                   <Label htmlFor="email">Email Address</Label>
                   <Input id="email" value={user?.email} disabled className="mt-1 bg-muted" />
                   <p className="text-xs text-muted-foreground mt-1">Email cannot be changed.</p>
                 </div>
+
+                {/* Phone */}
                 <div>
                   <Label htmlFor="phone" className="flex items-center gap-1"><Phone className="h-3 w-3" /> Phone Number</Label>
                   <Input id="phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+91 9876543210" className="mt-1" />
                 </div>
+
+                {/* WhatsApp */}
                 <div>
-                  <Label htmlFor="address" className="flex items-center gap-1"><MapPin className="h-3 w-3" /> Address</Label>
+                  <Label htmlFor="whatsapp" className="flex items-center gap-1"><MessageCircle className="h-3 w-3" /> WhatsApp Number</Label>
+                  <Input id="whatsapp" value={whatsappNumber} onChange={e => setWhatsappNumber(e.target.value)} placeholder="+91 9876543210" className="mt-1" />
+                </div>
+
+                {/* Address */}
+                <div>
+                  <Label htmlFor="address" className="flex items-center gap-1"><MapPin className="h-3 w-3" /> Delivery Address</Label>
                   <Input id="address" value={address} onChange={e => setAddress(e.target.value)} placeholder="Your delivery address" className="mt-1" />
                 </div>
+
+                {/* UPI ID */}
                 <div>
                   <Label htmlFor="upiId" className="flex items-center gap-1"><Wallet className="h-3 w-3" /> UPI ID</Label>
                   <Input id="upiId" value={upiId} onChange={e => setUpiId(e.target.value)} placeholder="yourname@upi or 9876543210@paytm" className="mt-1" />
                   <p className="text-xs text-muted-foreground mt-1">Used for coin withdrawals from your referral earnings.</p>
                 </div>
+
+                {/* Language */}
                 <div>
                   <Label>Language / भाषा</Label>
                   <Select value={language} onValueChange={setLanguage}>
@@ -192,6 +308,7 @@ export default function Profile() {
                     </SelectContent>
                   </Select>
                 </div>
+
                 <Button onClick={saveProfile} disabled={saving} className="w-full sm:w-auto">
                   {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                   Save Changes
@@ -208,17 +325,27 @@ export default function Profile() {
             <CardContent className="space-y-4 max-w-md">
               <div>
                 <Label htmlFor="current-password">Current Password</Label>
-                <Input id="current-password" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="mt-1" />
+                <Input id="current-password" type="password" autoComplete="current-password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="mt-1" />
               </div>
               <div>
                 <Label htmlFor="new-password">New Password</Label>
-                <Input id="new-password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="mt-1" />
+                <Input id="new-password" type="password" autoComplete="new-password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="mt-1" />
               </div>
               <div>
                 <Label htmlFor="confirm-password">Confirm New Password</Label>
-                <Input id="confirm-password" type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="mt-1" />
+                <Input id="confirm-password" type="password" autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="mt-1" />
               </div>
-              <Button onClick={changePassword} disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword} className="w-full sm:w-auto">
+              {newPassword && confirmPassword && newPassword !== confirmPassword && (
+                <p className="text-sm text-destructive">Passwords don't match.</p>
+              )}
+              {newPassword && newPassword.length < 6 && (
+                <p className="text-sm text-destructive">Password must be at least 6 characters.</p>
+              )}
+              <Button
+                onClick={changePassword}
+                disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword || newPassword.length < 6}
+                className="w-full sm:w-auto"
+              >
                 {changingPassword ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="mr-2 h-4 w-4" />}
                 Change Password
               </Button>

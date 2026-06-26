@@ -2,6 +2,9 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-key-change-in-production";
+if (!process.env.JWT_SECRET) {
+  console.warn("[security] JWT_SECRET is not set — using insecure default. Set JWT_SECRET in your environment secrets before deploying.");
+}
 const SALT_ROUNDS = 10;
 
 export function hashPassword(password: string): Promise<string> {

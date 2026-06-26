@@ -30,6 +30,12 @@ export const adminSettingsTable = pgTable("admin_settings", {
   minRequiredVersion: text("min_required_version").notNull().default("1.0.0"),
   updateDownloadLink: text("update_download_link"),
   forceUpdateEnabled: boolean("force_update_enabled").notNull().default(false),
+  // Appearance & branding
+  storeName: text("store_name").notNull().default("XyloCart"),
+  primaryColor: text("primary_color").notNull().default("#3b82f6"),
+  defaultTheme: text("default_theme").notNull().default("light"),
+  // Language & localization
+  defaultLanguage: text("default_language").notNull().default("en"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

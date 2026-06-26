@@ -4,6 +4,7 @@ import { usersTable, ordersTable, notificationsTable, adminSettingsTable, ticket
 import { eq, desc, and, gt, lt, or, like, inArray } from "drizzle-orm";
 import { requireAdmin, type AuthRequest } from "../lib/middleware";
 import { broadcastToAll, getOnlineUserIds } from "../lib/websocket";
+import { getUncachableStripeClient } from "../stripeClient";
 
 const router = Router();
 
@@ -41,6 +42,10 @@ router.get("/admin/settings", requireAdmin, async (_req, res) => {
       minRequiredVersion: settings.minRequiredVersion,
       updateDownloadLink: settings.updateDownloadLink,
       forceUpdateEnabled: settings.forceUpdateEnabled,
+      storeName: settings.storeName,
+      primaryColor: settings.primaryColor,
+      defaultTheme: settings.defaultTheme,
+      defaultLanguage: settings.defaultLanguage,
       updatedAt: settings.updatedAt.toISOString(),
     });
   } catch { res.status(500).json({ error: "Failed to get settings" }); }
@@ -57,6 +62,7 @@ router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
       guestModeEnabled, minOrderAmount, codEnabled, paymentGateway,
       razorpayKeyId, razorpayKeySecret, stripePublishableKey, stripeSecretKey,
       logoUrl, currentAppVersion, minRequiredVersion, updateDownloadLink, forceUpdateEnabled,
+      storeName, primaryColor, defaultTheme, defaultLanguage,
     } = req.body;
 
     const [updated] = await db.update(adminSettingsTable).set({
@@ -85,6 +91,10 @@ router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
       minRequiredVersion: minRequiredVersion !== undefined ? minRequiredVersion : settings.minRequiredVersion,
       updateDownloadLink: updateDownloadLink !== undefined ? (updateDownloadLink || null) : settings.updateDownloadLink,
       forceUpdateEnabled: forceUpdateEnabled !== undefined ? forceUpdateEnabled : settings.forceUpdateEnabled,
+      storeName: storeName !== undefined ? (storeName || "XyloCart") : settings.storeName,
+      primaryColor: primaryColor !== undefined ? (primaryColor || "#3b82f6") : settings.primaryColor,
+      defaultTheme: defaultTheme !== undefined ? defaultTheme : settings.defaultTheme,
+      defaultLanguage: defaultLanguage !== undefined ? defaultLanguage : settings.defaultLanguage,
       updatedAt: new Date(),
     }).where(eq(adminSettingsTable.id, settings.id)).returning();
 
@@ -94,6 +104,8 @@ router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
       referralEnabled: updated.referralEnabled,
       loginEnabled: updated.loginEnabled,
       signupEnabled: updated.signupEnabled,
+      storeName: updated.storeName,
+      primaryColor: updated.primaryColor,
     });
 
     res.json({
@@ -120,9 +132,48 @@ router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
       minRequiredVersion: updated.minRequiredVersion,
       updateDownloadLink: updated.updateDownloadLink,
       forceUpdateEnabled: updated.forceUpdateEnabled,
+      storeName: updated.storeName,
+      primaryColor: updated.primaryColor,
+      defaultTheme: updated.defaultTheme,
+      defaultLanguage: updated.defaultLanguage,
       updatedAt: updated.updatedAt.toISOString(),
     });
   } catch { res.status(500).json({ error: "Failed to update settings" }); }
+});
+
+// ─── PAYMENT LOGS ───────────────────────────────────────────────────────────
+
+router.get("/admin/payment-logs", requireAdmin, async (_req, res) => {
+  try {
+    const stripe = await getUncachableStripeClient();
+    const paymentIntents = await stripe.paymentIntents.list({ limit: 100, expand: ["data.customer"] });
+
+    const logs = paymentIntents.data.map(pi => ({
+      id: pi.id,
+      amount: pi.amount,
+      amountReceived: pi.amount_received,
+      currency: pi.currency.toUpperCase(),
+      status: pi.status,
+      description: pi.description,
+      customerEmail: typeof pi.customer === "object" && pi.customer !== null ? (pi.customer as any).email ?? null : null,
+      customerId: typeof pi.customer === "string" ? pi.customer : (pi.customer as any)?.id ?? null,
+      paymentMethod: pi.payment_method_types?.[0] ?? "card",
+      receiptEmail: pi.receipt_email,
+      metadata: pi.metadata,
+      createdAt: new Date(pi.created * 1000).toISOString(),
+      canceledAt: pi.canceled_at ? new Date(pi.canceled_at * 1000).toISOString() : null,
+      cancellationReason: pi.cancellation_reason,
+      errorMessage: pi.last_payment_error?.message ?? null,
+    }));
+
+    res.json({ data: logs, hasMore: paymentIntents.has_more });
+  } catch (err: any) {
+    if (err.message?.includes("Missing Replit environment") || err.message?.includes("not connected")) {
+      res.status(503).json({ error: "Stripe integration not connected. Please connect Stripe via the Integrations tab.", code: "STRIPE_NOT_CONNECTED" });
+    } else {
+      res.status(500).json({ error: err.message || "Failed to fetch payment logs" });
+    }
+  }
 });
 
 router.get("/admin/stats", requireAdmin, async (_req, res) => {
@@ -200,7 +251,6 @@ router.get("/admin/analytics", requireAdmin, async (_req, res) => {
 
 // ─── SECURITY ENDPOINTS ────────────────────────────────────────────────────
 
-// List all blocked IPs
 router.get("/admin/security/blocked-ips", requireAdmin, async (_req, res) => {
   try {
     const blocked = await db.select().from(blockedIpsTable).orderBy(desc(blockedIpsTable.createdAt));
@@ -208,7 +258,6 @@ router.get("/admin/security/blocked-ips", requireAdmin, async (_req, res) => {
   } catch { res.status(500).json({ error: "Failed to get blocked IPs" }); }
 });
 
-// Block an IP
 router.post("/admin/security/block-ip", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { ipAddress, reason, permanent, durationHours } = req.body;
@@ -216,7 +265,6 @@ router.post("/admin/security/block-ip", requireAdmin, async (req: AuthRequest, r
 
     const expiresAt = permanent ? null : new Date(Date.now() + (durationHours || 24) * 3600 * 1000);
 
-    // Upsert
     const existing = await db.select().from(blockedIpsTable).where(eq(blockedIpsTable.ipAddress, ipAddress)).limit(1);
     if (existing.length > 0) {
       await db.update(blockedIpsTable).set({ reason: reason || "Manual block", permanent: !!permanent, expiresAt, blockedBy: req.userId }).where(eq(blockedIpsTable.ipAddress, ipAddress));
@@ -229,7 +277,6 @@ router.post("/admin/security/block-ip", requireAdmin, async (req: AuthRequest, r
   } catch { res.status(500).json({ error: "Failed to block IP" }); }
 });
 
-// Unblock an IP
 router.delete("/admin/security/block-ip/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -241,7 +288,6 @@ router.delete("/admin/security/block-ip/:id", requireAdmin, async (req: AuthRequ
   } catch { res.status(500).json({ error: "Failed to unblock IP" }); }
 });
 
-// Security overview: unique IPs, suspicious activity, locked accounts
 router.get("/admin/security/overview", requireAdmin, async (_req, res) => {
   try {
     const recentLogs = await db.select({ log: activityLogsTable, userName: usersTable.name })
@@ -255,7 +301,6 @@ router.get("/admin/security/overview", requireAdmin, async (_req, res) => {
       .from(usersTable)
       .where(gt(usersTable.loginAttempts, 0));
 
-    // Unique IPs from logs
     const ipCounts = new Map<string, number>();
     const ipActions = new Map<string, string[]>();
     for (const { log } of recentLogs) {
@@ -267,7 +312,6 @@ router.get("/admin/security/overview", requireAdmin, async (_req, res) => {
       }
     }
 
-    // Failed login attempts by IP
     const failedLogins = recentLogs.filter(({ log }) => log.action === "login_failed" || log.action === "login_account_locked");
     const failedByIp = new Map<string, number>();
     for (const { log } of failedLogins) {
@@ -290,7 +334,6 @@ router.get("/admin/security/overview", requireAdmin, async (_req, res) => {
         recentActions: [...new Set(ipActions.get(ip) || [])].slice(0, 5),
       }));
 
-    // Users by device / IP
     const userDevices = await db.select({
       id: usersTable.id, name: usersTable.name, email: usersTable.email,
       deviceId: usersTable.deviceId, lastLoginIp: usersTable.lastLoginIp,
@@ -311,7 +354,6 @@ router.get("/admin/security/overview", requireAdmin, async (_req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: "Failed to get security overview" }); }
 });
 
-// Unlock a user account
 router.post("/admin/security/unlock-user/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);

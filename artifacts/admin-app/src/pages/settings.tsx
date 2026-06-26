@@ -11,7 +11,7 @@ import { useAuth } from "@/lib/auth";
 import {
   Loader2, ShoppingCart, Wrench, Clock, Gift, Save, Shield, Lock,
   LogIn, UserPlus, UserCheck, CreditCard, Truck, Globe, Bell, Megaphone, Trash2, Plus,
-  Smartphone, RefreshCw, Image as ImageIcon, Download,
+  Smartphone, RefreshCw, Image as ImageIcon, Download, Palette, Languages,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +72,12 @@ export default function Settings() {
   const [minRequiredVersion, setMinRequiredVersion] = useState("1.0.0");
   const [updateDownloadLink, setUpdateDownloadLink] = useState("");
   const [forceUpdateEnabled, setForceUpdateEnabled] = useState(false);
+  // Appearance & branding
+  const [storeName, setStoreName] = useState("XyloCart");
+  const [primaryColor, setPrimaryColor] = useState("#3b82f6");
+  const [defaultTheme, setDefaultTheme] = useState("light");
+  // Language
+  const [defaultLanguage, setDefaultLanguage] = useState("en");
   // Announcements
   const [newAnnText, setNewAnnText] = useState("");
   const [addingAnn, setAddingAnn] = useState(false);
@@ -105,6 +111,10 @@ export default function Settings() {
       setMinRequiredVersion(settings.minRequiredVersion ?? "1.0.0");
       setUpdateDownloadLink(settings.updateDownloadLink ?? "");
       setForceUpdateEnabled(settings.forceUpdateEnabled ?? false);
+      setStoreName(settings.storeName ?? "XyloCart");
+      setPrimaryColor(settings.primaryColor ?? "#3b82f6");
+      setDefaultTheme(settings.defaultTheme ?? "light");
+      setDefaultLanguage(settings.defaultLanguage ?? "en");
     }
   }, [settings]);
 
@@ -506,6 +516,126 @@ export default function Settings() {
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Save App Configuration
             </Button>
+          </CardContent>
+        </Card>
+
+        {/* ─── Appearance & Branding ────────────────────────────────────── */}
+        <Card className="border-purple-200">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Palette className="h-6 w-6 text-purple-500" />
+              <div><CardTitle>Appearance & Branding</CardTitle><CardDescription>Customize the platform's name, colors, and default theme</CardDescription></div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="space-y-1.5">
+              <Label>Store / Platform Name</Label>
+              <Input
+                placeholder="XyloCart"
+                value={storeName}
+                onChange={e => setStoreName(e.target.value)}
+                maxLength={60}
+              />
+              <p className="text-xs text-muted-foreground">Shown in app headers and email templates</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Primary Brand Color</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={primaryColor}
+                  onChange={e => setPrimaryColor(e.target.value)}
+                  className="h-10 w-14 rounded-md border cursor-pointer bg-transparent p-0.5"
+                />
+                <Input
+                  value={primaryColor}
+                  onChange={e => setPrimaryColor(e.target.value)}
+                  placeholder="#3b82f6"
+                  className="max-w-[140px] font-mono"
+                  maxLength={7}
+                />
+                <span className="text-sm text-muted-foreground">Used for buttons and highlights</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Default Platform Theme</Label>
+              <Select value={defaultTheme} onValueChange={setDefaultTheme}>
+                <SelectTrigger className="max-w-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="light">☀️ Light</SelectItem>
+                  <SelectItem value="dark">🌙 Dark</SelectItem>
+                  <SelectItem value="system">🖥️ System Default</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Applied to new users before they set their own preference</p>
+            </div>
+
+            <Button
+              onClick={() => save({ storeName: storeName || "XyloCart", primaryColor: primaryColor || "#3b82f6", defaultTheme })}
+              disabled={saving}
+              variant="outline"
+              className="border-purple-200 text-purple-700 hover:bg-purple-50"
+            >
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Save Appearance
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* ─── Language & Localization ──────────────────────────────────── */}
+        <Card className="border-teal-200">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Languages className="h-6 w-6 text-teal-500" />
+              <div><CardTitle>Language & Localization</CardTitle><CardDescription>Set the platform's default language for new users</CardDescription></div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Default Platform Language</Label>
+              <Select value={defaultLanguage} onValueChange={v => { setDefaultLanguage(v); save({ defaultLanguage: v }); }}>
+                <SelectTrigger className="max-w-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    { code: "en", label: "English" },
+                    { code: "ar", label: "Arabic / عربي" },
+                    { code: "fr", label: "French / Français" },
+                    { code: "es", label: "Spanish / Español" },
+                    { code: "de", label: "German / Deutsch" },
+                    { code: "zh", label: "Chinese / 中文" },
+                    { code: "hi", label: "Hindi / हिन्दी" },
+                    { code: "pt", label: "Portuguese / Português" },
+                    { code: "bn", label: "Bengali / বাংলা" },
+                    { code: "ta", label: "Tamil / தமிழ்" },
+                    { code: "te", label: "Telugu / తెలుగు" },
+                    { code: "mr", label: "Marathi / मराठी" },
+                    { code: "gu", label: "Gujarati / ગુજરાતી" },
+                    { code: "kn", label: "Kannada / ಕನ್ನಡ" },
+                    { code: "ml", label: "Malayalam / മലയാളം" },
+                    { code: "pa", label: "Punjabi / ਪੰਜਾਬੀ" },
+                    { code: "ur", label: "Urdu / اردو" },
+                  ].map(l => <SelectItem key={l.code} value={l.code}>{l.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Saved automatically on selection. Users can override their own language in Profile Settings.</p>
+            </div>
+            <div className="p-3 rounded-lg bg-teal-50 border border-teal-200 text-sm text-teal-800">
+              <Globe className="h-4 w-4 inline mr-1.5" />
+              Currently set to: <strong>{[
+                { code: "en", label: "English" }, { code: "ar", label: "Arabic" }, { code: "fr", label: "French" },
+                { code: "es", label: "Spanish" }, { code: "de", label: "German" }, { code: "zh", label: "Chinese" },
+                { code: "hi", label: "Hindi" }, { code: "pt", label: "Portuguese" }, { code: "bn", label: "Bengali" },
+                { code: "ta", label: "Tamil" }, { code: "te", label: "Telugu" }, { code: "mr", label: "Marathi" },
+                { code: "gu", label: "Gujarati" }, { code: "kn", label: "Kannada" }, { code: "ml", label: "Malayalam" },
+                { code: "pa", label: "Punjabi" }, { code: "ur", label: "Urdu" },
+              ].find(l => l.code === defaultLanguage)?.label ?? defaultLanguage}</strong>
+            </div>
           </CardContent>
         </Card>
 
