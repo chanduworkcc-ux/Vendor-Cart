@@ -122,7 +122,7 @@ export default function Login() {
                   backdropFilter: "blur(12px)",
                   border: "1px solid rgba(255,255,255,0.2)",
                 }}>
-                  <img src="/xylocart-logo.png" alt="XyloCart" className="h-16 w-16 object-contain" />
+                  <img src={`${import.meta.env.BASE_URL}xylocart-logo.png`} alt="XyloCart" className="h-16 w-16 object-contain" />
                 </div>
               </motion.div>
               <div>

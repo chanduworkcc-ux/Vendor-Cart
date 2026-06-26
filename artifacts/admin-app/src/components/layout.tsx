@@ -113,7 +113,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex items-center gap-2 select-none">
       <div className="xylo-logo-bounce" style={{ display: 'inline-block' }}>
         <img
-          src="/xylocart-logo.png"
+          src={`${import.meta.env.BASE_URL}xylocart-logo.png`}
           alt="XyloCart"
           className={`object-contain drop-shadow-md ${compact ? "h-8 w-8" : "h-9 w-9"}`}
           style={{ filter: 'drop-shadow(0 4px 10px rgba(59,130,246,0.35))' }}

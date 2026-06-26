@@ -110,7 +110,7 @@ export default function Login() {
                 transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
               >
                 <div style={{ filter: "drop-shadow(0 8px 24px rgba(59,130,246,0.4))" }}>
-                  <img src="/xylocart-logo.png" alt="XyloCart" className="h-20 w-20 object-contain" />
+                  <img src={`${import.meta.env.BASE_URL}xylocart-logo.png`} alt="XyloCart" className="h-20 w-20 object-contain" />
                 </div>
               </motion.div>
               <div>
