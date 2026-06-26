@@ -1,25 +1,18 @@
-import nodemailer from "nodemailer";
+export async function sendOtpEmail(
+  to: string,
+  name: string,
+  otp: string,
+): Promise<{ sent: boolean; preview?: string }> {
+  const apiKey = process.env.BREVO_API_KEY;
+  const fromEmail = process.env.SMTP_USER || process.env.BREVO_FROM_EMAIL;
+  const fromName = process.env.BREVO_FROM_NAME || "ShopAll";
 
-function createTransport() {
-  const host = process.env.SMTP_HOST;
-  const port = parseInt(process.env.SMTP_PORT || "465");
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-
-  if (host && user && pass) {
-    return nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      auth: { user, pass },
-    });
+  if (!apiKey || !fromEmail) {
+    // Dev fallback — log OTP to console
+    console.log(`\n[MAILER DEV] OTP for ${to}: ${otp}\n`);
+    return { sent: false, preview: otp };
   }
 
-  return null;
-}
-
-export async function sendOtpEmail(to: string, name: string, otp: string): Promise<{ sent: boolean; preview?: string }> {
-  const subject = "Your Verification Code";
   const html = `
     <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px">
       <h2 style="color:#2563eb;margin-bottom:8px">Email Verification</h2>
@@ -32,21 +25,32 @@ export async function sendOtpEmail(to: string, name: string, otp: string): Promi
     </div>
   `;
 
-  const transport = createTransport();
+  try {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "api-key": apiKey,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        sender: { name: fromName, email: fromEmail },
+        to: [{ email: to, name }],
+        subject: "Your Verification Code",
+        htmlContent: html,
+      }),
+    });
 
-  if (transport) {
-    try {
-      const from = process.env.SMTP_FROM || process.env.SMTP_USER || "noreply@example.com";
-      await transport.sendMail({ from, to, subject, html });
-      console.log(`[mailer] OTP sent to ${to}`);
-      return { sent: true };
-    } catch (err) {
-      console.error("[mailer] Failed to send email:", err);
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      console.error("[mailer] Brevo API error:", response.status, JSON.stringify(err));
       return { sent: false };
     }
-  }
 
-  // Dev fallback — log OTP to console
-  console.log(`\n[MAILER DEV] OTP for ${to}: ${otp}\n`);
-  return { sent: false, preview: otp };
+    console.log(`[mailer] OTP sent to ${to} via Brevo`);
+    return { sent: true };
+  } catch (err) {
+    console.error("[mailer] Failed to send email:", err);
+    return { sent: false };
+  }
 }
