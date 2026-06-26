@@ -2,6 +2,7 @@ import { pgTable, serial, text, integer, numeric, timestamp, pgEnum, boolean } f
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
+import { productsTable } from "./products";
 
 export const orderStatusEnum = pgEnum("order_status", ["pending", "processing", "shipped", "delivered", "cancelled"]);
 
@@ -9,6 +10,8 @@ export const ordersTable = pgTable("orders", {
   id: serial("id").primaryKey(),
   orderRef: text("order_ref"),
   userId: integer("user_id").notNull().references(() => usersTable.id),
+  // Link to a specific product — used to enforce one-purchase-per-product-per-user
+  productId: integer("product_id").references(() => productsTable.id),
   title: text("title").notNull(),
   description: text("description"),
   quantity: integer("quantity").notNull().default(1),

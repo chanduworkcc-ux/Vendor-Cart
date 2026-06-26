@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { ordersTable, usersTable, notificationsTable, adminSettingsTable, activityLogsTable } from "@workspace/db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { ordersTable, usersTable, notificationsTable, adminSettingsTable, activityLogsTable, productsTable } from "@workspace/db/schema";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin, type AuthRequest } from "../lib/middleware";
 import { broadcastToUser, broadcastToAdmins } from "../lib/websocket";
 
@@ -62,7 +62,7 @@ router.post("/orders", requireAuth, async (req: AuthRequest, res) => {
       res.status(400).json({ error: "Orders are not being accepted at this time" }); return;
     }
 
-    const { title, description, notes } = req.body;
+    const { title, description, notes, productId } = req.body;
 
     // Strict input validation — reject empty or generic test values
     if (!title || typeof title !== "string" || title.trim().length < 3) {
@@ -76,6 +76,42 @@ router.post("/orders", requireAuth, async (req: AuthRequest, res) => {
     }
     if (description && typeof description === "string" && GENERIC_REJECT.test(description.trim())) {
       res.status(400).json({ error: "Please provide a genuine description." }); return;
+    }
+
+    // ── Stock & product validation ────────────────────────────────────────────
+    const resolvedProductId: number | null = productId ? parseInt(productId) : null;
+    if (resolvedProductId) {
+      const [product] = await db.select().from(productsTable)
+        .where(eq(productsTable.id, resolvedProductId)).limit(1);
+
+      if (!product || product.deletedAt) {
+        res.status(404).json({ error: "Product not found." }); return;
+      }
+      if (product.status !== "active") {
+        res.status(400).json({ error: "This product is not available for purchase." }); return;
+      }
+      if (product.stock <= 0) {
+        res.status(400).json({ error: "This product is out of stock." }); return;
+      }
+
+      // Anti-hoarding: one purchase per user per product (all non-cancelled orders count)
+      const existingPurchase = await db.select({ id: ordersTable.id })
+        .from(ordersTable)
+        .where(and(
+          eq(ordersTable.userId, req.userId!),
+          eq(ordersTable.productId, resolvedProductId),
+        ))
+        .limit(1);
+      const hasAlreadyPurchased = existingPurchase.some(() => true);
+      if (hasAlreadyPurchased) {
+        // Only block if there is any non-cancelled order for this product
+        const allForProduct = await db.select().from(ordersTable)
+          .where(and(eq(ordersTable.userId, req.userId!), eq(ordersTable.productId, resolvedProductId)));
+        const nonCancelled = allForProduct.filter(o => o.status !== "cancelled");
+        if (nonCancelled.length > 0) {
+          res.status(409).json({ error: "You have already purchased this item. Each item can only be bought once per account." }); return;
+        }
+      }
     }
 
     // Enforce cooldown
@@ -107,6 +143,7 @@ router.post("/orders", requireAuth, async (req: AuthRequest, res) => {
     const [order] = await db.insert(ordersTable).values({
       orderRef,
       userId: req.userId!,
+      productId: resolvedProductId,
       title: title.trim(),
       description: description?.trim() || null,
       quantity: 1,
@@ -114,6 +151,13 @@ router.post("/orders", requireAuth, async (req: AuthRequest, res) => {
       status: "pending",
       notes: notes?.trim() || null,
     }).returning();
+
+    // Decrement stock by exactly 1 when a product order is placed
+    if (resolvedProductId) {
+      await db.update(productsTable)
+        .set({ stock: sql`GREATEST(${productsTable.stock} - 1, 0)`, updatedAt: new Date() })
+        .where(eq(productsTable.id, resolvedProductId));
+    }
 
     await db.update(usersTable).set({ lastOrderAt: new Date(), updatedAt: new Date() }).where(eq(usersTable.id, req.userId!));
 
@@ -312,5 +356,22 @@ function formatOrder(order: typeof ordersTable.$inferSelect, userName?: string |
     updatedAt: order.updatedAt.toISOString(),
   };
 }
+
+// GET /api/orders/my-purchased-products — list productIds the current user has purchased (non-cancelled)
+router.get("/orders/my-purchased-products", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const allOrders = await db.select({ productId: ordersTable.productId, status: ordersTable.status })
+      .from(ordersTable)
+      .where(eq(ordersTable.userId, req.userId!));
+
+    const purchasedIds = allOrders
+      .filter(o => o.productId !== null && o.status !== "cancelled")
+      .map(o => o.productId as number);
+
+    res.json({ productIds: [...new Set(purchasedIds)] });
+  } catch {
+    res.status(500).json({ error: "Failed to fetch purchased products" });
+  }
+});
 
 export default router;

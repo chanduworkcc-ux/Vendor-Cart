@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { productsTable, categoriesTable } from "@workspace/db/schema";
-import { eq, desc, ilike, or } from "drizzle-orm";
+import { eq, desc, isNull, sql } from "drizzle-orm";
 import { requireAuth, requireAdmin, type AuthRequest } from "../lib/middleware";
 
 const router = Router();
@@ -18,6 +18,7 @@ function fmt(p: typeof productsTable.$inferSelect) {
     badge: p.badge,
     stock: p.stock,
     status: p.status,
+    deletedAt: p.deletedAt ? p.deletedAt.toISOString() : null,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
   };
@@ -26,17 +27,27 @@ function fmt(p: typeof productsTable.$inferSelect) {
 // GET /api/products — public (any authenticated user or guest)
 router.get("/products", async (req, res) => {
   try {
-    const { category, search, status } = req.query as Record<string, string>;
+    const { category, search, status, includeDeleted } = req.query as Record<string, string>;
+    const isAdmin = (req as AuthRequest).userRole === "admin";
+
     let products = await db.select().from(productsTable).orderBy(desc(productsTable.createdAt));
 
-    // Non-admin users only see active products
-    const isAdmin = (req as AuthRequest).userRole === "admin";
-    if (!isAdmin) products = products.filter(p => p.status === "active");
+    // Customers NEVER see deleted products — hard rule
+    if (!isAdmin || includeDeleted !== "true") {
+      products = products.filter(p => !p.deletedAt);
+    }
+
+    // Non-admin users only see active, non-deleted products
+    if (!isAdmin) {
+      products = products.filter(p => p.status === "active");
+    }
     if (status && isAdmin) products = products.filter(p => p.status === status);
     if (category) products = products.filter(p => p.category === category);
     if (search) {
       const q = search.toLowerCase();
-      products = products.filter(p => p.name.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q));
+      products = products.filter(p =>
+        p.name.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q)
+      );
     }
 
     res.json({ data: products.map(fmt) });
@@ -48,8 +59,12 @@ router.get("/products", async (req, res) => {
 // GET /api/products/:id
 router.get("/products/:id", async (req, res) => {
   try {
-    const [p] = await db.select().from(productsTable).where(eq(productsTable.id, parseInt(req.params.id))).limit(1);
+    const isAdmin = (req as AuthRequest).userRole === "admin";
+    const [p] = await db.select().from(productsTable)
+      .where(eq(productsTable.id, parseInt(req.params.id))).limit(1);
     if (!p) { res.status(404).json({ error: "Product not found" }); return; }
+    // Customers cannot access deleted products
+    if (!isAdmin && p.deletedAt) { res.status(404).json({ error: "Product not found" }); return; }
     res.json(fmt(p));
   } catch {
     res.status(500).json({ error: "Failed to get product" });
@@ -83,7 +98,7 @@ router.post("/products", requireAdmin, async (req: AuthRequest, res) => {
   }
 });
 
-// PATCH /api/products/:id — admin only
+// PATCH /api/products/:id — admin only (general update)
 router.patch("/products/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -106,7 +121,7 @@ router.patch("/products/:id", requireAdmin, async (req: AuthRequest, res) => {
         ? (discountPrice && !isNaN(parseFloat(discountPrice)) ? String(parseFloat(discountPrice)) : null)
         : existing.discountPrice,
       badge: badge !== undefined ? (badge?.trim() || null) : existing.badge,
-      stock: stock !== undefined ? (parseInt(stock) || 0) : existing.stock,
+      stock: stock !== undefined ? Math.max(0, parseInt(stock) || 0) : existing.stock,
       status: status ?? existing.status,
       updatedAt: new Date(),
     }).where(eq(productsTable.id, id)).returning();
@@ -117,13 +132,58 @@ router.patch("/products/:id", requireAdmin, async (req: AuthRequest, res) => {
   }
 });
 
-// DELETE /api/products/:id — admin only
+// POST /api/products/:id/add-stock — admin only: add units to stock
+router.post("/products/:id/add-stock", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const qty = parseInt(req.body.quantity);
+    if (!qty || qty < 1) { res.status(400).json({ error: "quantity must be a positive integer" }); return; }
+
+    const [existing] = await db.select().from(productsTable).where(eq(productsTable.id, id)).limit(1);
+    if (!existing) { res.status(404).json({ error: "Product not found" }); return; }
+
+    const [updated] = await db.update(productsTable).set({
+      stock: sql`${productsTable.stock} + ${qty}`,
+      updatedAt: new Date(),
+    }).where(eq(productsTable.id, id)).returning();
+
+    res.json(fmt(updated));
+  } catch {
+    res.status(500).json({ error: "Failed to add stock" });
+  }
+});
+
+// PATCH /api/products/:id/out-of-stock — admin only: mark out of stock (stock = 0)
+router.patch("/products/:id/out-of-stock", requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    const [existing] = await db.select().from(productsTable).where(eq(productsTable.id, id)).limit(1);
+    if (!existing) { res.status(404).json({ error: "Product not found" }); return; }
+
+    const [updated] = await db.update(productsTable).set({
+      stock: 0,
+      updatedAt: new Date(),
+    }).where(eq(productsTable.id, id)).returning();
+
+    res.json(fmt(updated));
+  } catch {
+    res.status(500).json({ error: "Failed to mark out of stock" });
+  }
+});
+
+// DELETE /api/products/:id — admin only (SOFT DELETE: hidden from customers, recoverable)
 router.delete("/products/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const id = parseInt(req.params.id);
-    const [del] = await db.delete(productsTable).where(eq(productsTable.id, id)).returning();
-    if (!del) { res.status(404).json({ error: "Product not found" }); return; }
-    res.json({ success: true });
+    const [existing] = await db.select().from(productsTable).where(eq(productsTable.id, id)).limit(1);
+    if (!existing) { res.status(404).json({ error: "Product not found" }); return; }
+
+    const [updated] = await db.update(productsTable).set({
+      deletedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(productsTable.id, id)).returning();
+
+    res.json({ success: true, deletedAt: updated.deletedAt });
   } catch {
     res.status(500).json({ error: "Failed to delete product" });
   }
@@ -131,7 +191,6 @@ router.delete("/products/:id", requireAdmin, async (req: AuthRequest, res) => {
 
 // ─── CATEGORIES ──────────────────────────────────────────────────────────────
 
-// GET /api/categories
 router.get("/categories", async (_req, res) => {
   try {
     const cats = await db.select().from(categoriesTable).orderBy(categoriesTable.name);
@@ -141,7 +200,6 @@ router.get("/categories", async (_req, res) => {
   }
 });
 
-// POST /api/categories — admin only
 router.post("/categories", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { name } = req.body;
@@ -154,7 +212,6 @@ router.post("/categories", requireAdmin, async (req: AuthRequest, res) => {
   }
 });
 
-// DELETE /api/categories/:id — admin only
 router.delete("/categories/:id", requireAdmin, async (req: AuthRequest, res) => {
   try {
     const [del] = await db.delete(categoriesTable).where(eq(categoriesTable.id, parseInt(req.params.id))).returning();

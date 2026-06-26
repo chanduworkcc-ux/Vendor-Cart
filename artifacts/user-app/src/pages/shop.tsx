@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, ShoppingCart, Package, Tag, AlertTriangle } from "lucide-react";
+import { Loader2, Search, ShoppingCart, Package, Tag, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { getListOrdersQueryKey } from "@workspace/api-client-react";
 
@@ -65,8 +65,23 @@ export default function Shop() {
     },
   });
 
+  // Fetch products the user has already purchased (non-cancelled orders with a productId)
+  const { data: purchasedData } = useQuery<{ productIds: number[] }>({
+    queryKey: ["my-purchased-products"],
+    queryFn: async () => {
+      if (!token) return { productIds: [] };
+      const res = await fetch("/api/orders/my-purchased-products", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return { productIds: [] };
+      return res.json();
+    },
+    enabled: !!token,
+  });
+
   const products = productsData?.data || [];
   const categories = categoriesData?.data || [];
+  const purchasedProductIds = new Set(purchasedData?.productIds || []);
 
   const handlePlaceOrder = async () => {
     if (!selectedProduct) return;
@@ -82,6 +97,7 @@ export default function Shop() {
           title: selectedProduct.name,
           description: selectedProduct.description || undefined,
           notes: orderNotes.trim() || undefined,
+          productId: selectedProduct.id,
         }),
       });
       const data = await res.json();
@@ -91,6 +107,8 @@ export default function Shop() {
         description: `Your order for "${selectedProduct.name}" has been submitted.`,
       });
       queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+      queryClient.invalidateQueries({ queryKey: ["my-purchased-products"] });
+      queryClient.invalidateQueries({ queryKey: ["shop-products"] });
       setSelectedProduct(null);
       setOrderNotes("");
     } catch (e: any) {
@@ -102,6 +120,12 @@ export default function Shop() {
 
   const displayPrice = (product: Product) =>
     product.discountPrice ? product.discountPrice : product.price;
+
+  const getProductState = (product: Product) => {
+    if (purchasedProductIds.has(product.id)) return "purchased";
+    if (product.stock === 0) return "out_of_stock";
+    return "available";
+  };
 
   return (
     <div className="space-y-6">
@@ -157,87 +181,115 @@ export default function Shop() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {products.map((product, i) => (
-            <motion.div
-              key={product.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: i * 0.05 }}
-            >
-              <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-200 flex flex-col h-full">
-                {/* Image */}
-                <div className="relative bg-muted aspect-[4/3] overflow-hidden">
-                  {product.images && product.images.length > 0 ? (
-                    <img
-                      src={product.images[0]}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = "";
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Package className="h-12 w-12 text-muted-foreground/40" />
-                    </div>
-                  )}
-                  {product.badge && (
-                    <Badge className="absolute top-2 left-2 bg-primary text-primary-foreground">
-                      {product.badge}
-                    </Badge>
-                  )}
-                  {product.discountPrice && (
-                    <Badge className="absolute top-2 right-2 bg-red-500 text-white">
-                      Sale
-                    </Badge>
-                  )}
-                </div>
+          {products.map((product, i) => {
+            const state = getProductState(product);
+            const isUnavailable = state !== "available";
 
-                <CardContent className="flex-1 p-4 space-y-2">
-                  {product.category && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Tag className="h-3 w-3" />
-                      {product.category}
-                    </div>
-                  )}
-                  <h3 className="font-semibold text-base leading-tight">{product.name}</h3>
-                  {product.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">{product.description}</p>
-                  )}
-                  <div className="flex items-center gap-2 pt-1">
-                    <span className="text-lg font-bold text-primary">
-                      ₹{displayPrice(product).toFixed(2)}
-                    </span>
-                    {product.discountPrice && (
-                      <span className="text-sm text-muted-foreground line-through">
-                        ₹{product.price.toFixed(2)}
-                      </span>
+            return (
+              <motion.div
+                key={product.id}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: i * 0.05 }}
+              >
+                <Card className={`overflow-hidden hover:shadow-lg transition-shadow duration-200 flex flex-col h-full ${isUnavailable ? "opacity-80" : ""}`}>
+                  {/* Image */}
+                  <div className="relative bg-muted aspect-[4/3] overflow-hidden">
+                    {product.images && product.images.length > 0 ? (
+                      <img
+                        src={product.images[0]}
+                        alt={product.name}
+                        className={`w-full h-full object-cover ${isUnavailable ? "grayscale" : ""}`}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = "";
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package className="h-12 w-12 text-muted-foreground/40" />
+                      </div>
+                    )}
+                    {product.badge && (
+                      <Badge className="absolute top-2 left-2 bg-primary text-primary-foreground">
+                        {product.badge}
+                      </Badge>
+                    )}
+                    {product.discountPrice && state === "available" && (
+                      <Badge className="absolute top-2 right-2 bg-red-500 text-white">
+                        Sale
+                      </Badge>
+                    )}
+                    {/* Overlay banners for unavailable states */}
+                    {state === "purchased" && (
+                      <div className="absolute inset-0 bg-green-900/40 flex items-center justify-center">
+                        <div className="bg-green-700 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Already Purchased
+                        </div>
+                      </div>
+                    )}
+                    {state === "out_of_stock" && (
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                        <div className="bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                          <XCircle className="h-3.5 w-3.5" /> Out of Stock
+                        </div>
+                      </div>
                     )}
                   </div>
-                  {product.stock <= 5 && product.stock > 0 && (
-                    <p className="text-xs text-orange-600 font-medium">Only {product.stock} left!</p>
-                  )}
-                  {product.stock === 0 && (
-                    <p className="text-xs text-red-500 font-medium">Out of stock</p>
-                  )}
-                  {/* Policy notice — mandatory on every product */}
-                  <p className="text-[11px] font-bold text-red-600 pt-1">{POLICY_TEXT}</p>
-                </CardContent>
 
-                <CardFooter className="p-4 pt-0">
-                  <Button
-                    className="w-full"
-                    disabled={product.stock === 0}
-                    onClick={() => { setSelectedProduct(product); setOrderNotes(""); }}
-                  >
-                    <ShoppingCart className="mr-2 h-4 w-4" />
-                    {product.stock === 0 ? "Out of Stock" : "Order Now"}
-                  </Button>
-                </CardFooter>
-              </Card>
-            </motion.div>
-          ))}
+                  <CardContent className="flex-1 p-4 space-y-2">
+                    {product.category && (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Tag className="h-3 w-3" />
+                        {product.category}
+                      </div>
+                    )}
+                    <h3 className="font-semibold text-base leading-tight">{product.name}</h3>
+                    {product.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">{product.description}</p>
+                    )}
+                    <div className="flex items-center gap-2 pt-1">
+                      <span className="text-lg font-bold text-primary">
+                        ₹{displayPrice(product).toFixed(2)}
+                      </span>
+                      {product.discountPrice && (
+                        <span className="text-sm text-muted-foreground line-through">
+                          ₹{product.price.toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                    {product.stock > 0 && product.stock <= 5 && state === "available" && (
+                      <p className="text-xs text-orange-600 font-medium">Only {product.stock} left!</p>
+                    )}
+                    {/* Policy notice */}
+                    <p className="text-[11px] font-bold text-red-600 pt-1">{POLICY_TEXT}</p>
+                  </CardContent>
+
+                  <CardFooter className="p-4 pt-0">
+                    {state === "purchased" ? (
+                      <Button className="w-full" variant="outline" disabled>
+                        <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
+                        Already Purchased
+                      </Button>
+                    ) : state === "out_of_stock" ? (
+                      <Button className="w-full" disabled>
+                        <XCircle className="mr-2 h-4 w-4" />
+                        Out of Stock
+                      </Button>
+                    ) : (
+                      <Button
+                        className="w-full"
+                        onClick={() => { setSelectedProduct(product); setOrderNotes(""); }}
+                      >
+                        <ShoppingCart className="mr-2 h-4 w-4" />
+                        Order Now
+                      </Button>
+                    )}
+                  </CardFooter>
+                </Card>
+              </motion.div>
+            );
+          })}
         </div>
       )}
 
@@ -277,7 +329,19 @@ export default function Shop() {
                       <span className="text-xs text-muted-foreground line-through">₹{selectedProduct.price.toFixed(2)}</span>
                     )}
                   </div>
+                  {/* Stock counter */}
+                  {selectedProduct.stock > 0 && selectedProduct.stock <= 5 && (
+                    <p className="text-xs text-orange-600 font-medium mt-1">Only {selectedProduct.stock} left!</p>
+                  )}
                 </div>
+              </div>
+
+              {/* Quantity restriction notice */}
+              <div className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg">
+                <Package className="h-4 w-4 text-blue-600 shrink-0" />
+                <p className="text-xs text-blue-700 font-medium">
+                  Limit: 1 item per customer · One-time purchase only
+                </p>
               </div>
 
               <div className="space-y-1.5">
@@ -291,7 +355,7 @@ export default function Shop() {
                 />
               </div>
 
-              {/* Mandatory policy notice — adjacent to order button */}
+              {/* Mandatory policy notice */}
               <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
                 <p className="text-xs font-bold text-red-700 leading-relaxed">

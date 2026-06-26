@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,9 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Package, Plus, Pencil, Trash2, Loader2, ImagePlus, X, Tag, Search, FolderPlus } from "lucide-react";
+import { Package, Plus, Pencil, Trash2, Loader2, ImagePlus, X, Tag, Search, FolderPlus, PlusCircle, MinusCircle } from "lucide-react";
 import { format } from "date-fns";
 
 const BASE = "";
@@ -26,6 +26,7 @@ interface Product {
   id: number; name: string; description?: string | null; images: string[];
   category?: string | null; price: number; discountPrice?: number | null;
   badge?: string | null; stock: number; status: string; createdAt: string;
+  deletedAt?: string | null;
 }
 interface Category { id: number; name: string; }
 
@@ -48,6 +49,11 @@ export default function Products() {
   const [addingCat, setAddingCat] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Add Stock dialog state
+  const [addStockProduct, setAddStockProduct] = useState<Product | null>(null);
+  const [addStockQty, setAddStockQty] = useState("1");
+  const [addingStock, setAddingStock] = useState(false);
+
   const { data: productsData, isLoading } = useQuery({
     queryKey: ["admin-products", filterStatus],
     queryFn: async () => {
@@ -67,7 +73,7 @@ export default function Products() {
     enabled: !!token,
   });
 
-  const products: Product[] = productsData?.data || [];
+  const products: Product[] = (productsData?.data || []).filter((p: Product) => !p.deletedAt);
   const categories: Category[] = catsData?.data || [];
 
   const filtered = products.filter(p =>
@@ -119,13 +125,46 @@ export default function Products() {
     } finally { setSaving(false); }
   };
 
+  // Soft delete
   const deleteProduct = async (id: number) => {
     try {
       const res = await fetch(`${BASE}/api/products/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error();
       qc.invalidateQueries({ queryKey: ["admin-products"] });
-      toast({ title: "Product deleted" });
+      toast({ title: "Product deleted", description: "Hidden from customers immediately." });
     } catch { toast({ title: "Failed to delete", variant: "destructive" }); }
+  };
+
+  // Mark out of stock
+  const markOutOfStock = async (id: number) => {
+    try {
+      const res = await fetch(`${BASE}/api/products/${id}/out-of-stock`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error();
+      qc.invalidateQueries({ queryKey: ["admin-products"] });
+      toast({ title: "Marked out of stock", description: "Stock set to 0. Customers cannot order this item." });
+    } catch { toast({ title: "Failed", variant: "destructive" }); }
+  };
+
+  // Add stock
+  const handleAddStock = async () => {
+    if (!addStockProduct) return;
+    const qty = parseInt(addStockQty);
+    if (!qty || qty < 1) { toast({ title: "Enter a valid quantity", variant: "destructive" }); return; }
+    setAddingStock(true);
+    try {
+      const res = await fetch(`${BASE}/api/products/${addStockProduct.id}/add-stock`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ quantity: qty }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error);
+      qc.invalidateQueries({ queryKey: ["admin-products"] });
+      toast({ title: `+${qty} units added`, description: `Stock updated for "${addStockProduct.name}".` });
+      setAddStockProduct(null);
+      setAddStockQty("1");
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    } finally { setAddingStock(false); }
   };
 
   const addCategory = async () => {
@@ -255,24 +294,76 @@ export default function Products() {
                         {p.discountPrice && <div className="text-xs text-green-600">Sale: ₹{p.discountPrice}</div>}
                       </td>
                       <td className="py-3">
-                        <span className={p.stock === 0 ? "text-red-600 font-medium" : ""}>{p.stock === 0 ? "Out of stock" : p.stock}</span>
+                        <span className={p.stock === 0 ? "text-red-600 font-medium" : "text-green-700 font-medium"}>
+                          {p.stock === 0 ? "Out of stock" : `${p.stock} in stock`}
+                        </span>
                       </td>
                       <td className="py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_COLORS[p.status] || ""}`}>{p.status}</span>
                       </td>
                       <td className="py-3">
-                        <div className="flex items-center gap-1">
-                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(p)}>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {/* Edit */}
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(p)} title="Edit product">
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
+
+                          {/* Add Stock */}
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-50"
+                            onClick={() => { setAddStockProduct(p); setAddStockQty("1"); }}
+                            title="Add stock"
+                          >
+                            <PlusCircle className="h-3.5 w-3.5" />
+                          </Button>
+
+                          {/* Mark Out of Stock */}
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
-                              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-orange-500 hover:text-orange-600 hover:bg-orange-50"
+                                title="Mark out of stock"
+                                disabled={p.stock === 0}
+                              >
+                                <MinusCircle className="h-3.5 w-3.5" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Mark "{p.name}" out of stock?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This sets the stock to 0. Customers will see "Out of Stock" and cannot order this item until you add stock again.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => markOutOfStock(p.id)}
+                                  className="bg-orange-500 hover:bg-orange-600 text-white"
+                                >
+                                  Mark Out of Stock
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+
+                          {/* Delete (soft) */}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" title="Delete product">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Delete "{p.name}"?</AlertDialogTitle>
-                                <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
+                                <AlertDialogDescription>
+                                  The product will be immediately hidden from all customers and removed from your public catalog. This action cannot be easily undone.
+                                </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -291,7 +382,46 @@ export default function Products() {
         </CardContent>
       </Card>
 
-      {/* Add/Edit Dialog */}
+      {/* Add Stock Dialog */}
+      <Dialog open={!!addStockProduct} onOpenChange={(open) => { if (!open) setAddStockProduct(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PlusCircle className="h-5 w-5 text-green-600" /> Add Stock
+            </DialogTitle>
+            <DialogDescription>
+              How many units would you like to add to <strong>{addStockProduct?.name}</strong>?
+              <br />
+              <span className="text-muted-foreground">Current stock: <strong>{addStockProduct?.stock ?? 0}</strong></span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <Label>Units to Add</Label>
+            <Input
+              type="number"
+              min="1"
+              value={addStockQty}
+              onChange={e => setAddStockQty(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleAddStock()}
+              autoFocus
+            />
+            {addStockProduct && (
+              <p className="text-xs text-muted-foreground">
+                New total will be: <strong>{(addStockProduct.stock || 0) + (parseInt(addStockQty) || 0)}</strong>
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddStockProduct(null)}>Cancel</Button>
+            <Button onClick={handleAddStock} disabled={addingStock} className="bg-green-600 hover:bg-green-700 text-white">
+              {addingStock ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <PlusCircle className="h-4 w-4 mr-2" />}
+              Add {parseInt(addStockQty) || 0} Units
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add/Edit Product Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

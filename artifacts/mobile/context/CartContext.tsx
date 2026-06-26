@@ -20,6 +20,8 @@ interface CartContextType {
   totalAmount: number;
 }
 
+const MAX_QTY_PER_ITEM = 1;
+
 const CartContext = createContext<CartContextType | null>(null);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
@@ -27,13 +29,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   const addToCart = useCallback((item: Omit<CartItem, 'quantity'>) => {
     setItems((prev) => {
+      // Anti-hoarding: if already in cart, do NOT increase quantity
       const existing = prev.find((i) => i.priceId === item.priceId);
-      if (existing) {
-        return prev.map((i) =>
-          i.priceId === item.priceId ? { ...i, quantity: i.quantity + 1 } : i
-        );
-      }
-      return [...prev, { ...item, quantity: 1 }];
+      if (existing) return prev; // already at max (1)
+      return [...prev, { ...item, quantity: MAX_QTY_PER_ITEM }];
     });
   }, []);
 
@@ -45,8 +44,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     if (quantity <= 0) {
       setItems((prev) => prev.filter((i) => i.priceId !== priceId));
     } else {
+      // Hard cap at MAX_QTY_PER_ITEM
+      const capped = Math.min(quantity, MAX_QTY_PER_ITEM);
       setItems((prev) =>
-        prev.map((i) => (i.priceId === priceId ? { ...i, quantity } : i))
+        prev.map((i) => (i.priceId === priceId ? { ...i, quantity: capped } : i))
       );
     }
   }, []);

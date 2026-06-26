@@ -15,10 +15,12 @@ export const productsTable = pgTable("products", {
   badge: text("badge"),
   stock: integer("stock").notNull().default(0),
   status: productStatusEnum("status").notNull().default("active"),
+  // Soft delete — set to non-null to hide from customers and public APIs
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-export const insertProductSchema = createInsertSchema(productsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertProductSchema = createInsertSchema(productsTable).omit({ id: true, createdAt: true, updatedAt: true, deletedAt: true });
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof productsTable.$inferSelect;
