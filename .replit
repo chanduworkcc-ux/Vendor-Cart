@@ -78,6 +78,6 @@ channel = "stable-25_05"
 [userenv]
 
 [userenv.shared]
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = "465"
+SMTP_HOST = "smtp-relay.brevo.com"
+SMTP_PORT = "587"
 SMTP_FROM = ""
