@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import {
   Loader2, ShoppingCart, Wrench, Clock, Gift, Save, Shield, Lock,
   LogIn, UserPlus, UserCheck, CreditCard, Truck, Globe, Bell, Megaphone, Trash2, Plus,
+  Smartphone, RefreshCw, Image as ImageIcon, Download,
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +66,12 @@ export default function Settings() {
   const [razorpayKeySecret, setRazorpayKeySecret] = useState("");
   const [stripePublishableKey, setStripePublishableKey] = useState("");
   const [stripeSecretKey, setStripeSecretKey] = useState("");
+  // App Configuration (Remote Config + Force Update)
+  const [logoUrl, setLogoUrl] = useState("");
+  const [currentAppVersion, setCurrentAppVersion] = useState("1.0.0");
+  const [minRequiredVersion, setMinRequiredVersion] = useState("1.0.0");
+  const [updateDownloadLink, setUpdateDownloadLink] = useState("");
+  const [forceUpdateEnabled, setForceUpdateEnabled] = useState(false);
   // Announcements
   const [newAnnText, setNewAnnText] = useState("");
   const [addingAnn, setAddingAnn] = useState(false);
@@ -93,6 +100,11 @@ export default function Settings() {
       setPaymentGateway(settings.paymentGateway ?? "cod_only");
       setRazorpayKeyId(settings.razorpayKeyId ?? "");
       setStripePublishableKey(settings.stripePublishableKey ?? "");
+      setLogoUrl(settings.logoUrl ?? "");
+      setCurrentAppVersion(settings.currentAppVersion ?? "1.0.0");
+      setMinRequiredVersion(settings.minRequiredVersion ?? "1.0.0");
+      setUpdateDownloadLink(settings.updateDownloadLink ?? "");
+      setForceUpdateEnabled(settings.forceUpdateEnabled ?? false);
     }
   }, [settings]);
 
@@ -421,6 +433,79 @@ export default function Settings() {
                 </Button>
               ))}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* ─── App Configuration ─────────────────────────────────────── */}
+        <Card className="border-blue-200">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <Smartphone className="h-6 w-6 text-blue-500" />
+              <div><CardTitle>App Configuration</CardTitle><CardDescription>Remote config, logo, and forced update engine</CardDescription></div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5"><ImageIcon className="h-3.5 w-3.5" /> Logo URL</Label>
+              <Input
+                placeholder="https://example.com/logo.png"
+                value={logoUrl}
+                onChange={e => setLogoUrl(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Displayed on loading screens and update pages</p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Current App Version</Label>
+                <Input
+                  placeholder="1.0.0"
+                  value={currentAppVersion}
+                  onChange={e => setCurrentAppVersion(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Latest published version of the app</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Minimum Required Version</Label>
+                <Input
+                  placeholder="1.0.0"
+                  value={minRequiredVersion}
+                  onChange={e => setMinRequiredVersion(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">Versions below this trigger forced update</p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5"><Download className="h-3.5 w-3.5" /> Download Link</Label>
+              <Input
+                placeholder="https://play.google.com/store/apps/..."
+                value={updateDownloadLink}
+                onChange={e => setUpdateDownloadLink(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">URL shown on the forced update screen</p>
+            </div>
+
+            <div className="flex items-center justify-between py-2">
+              <div>
+                <p className="font-medium flex items-center gap-1.5"><RefreshCw className="h-4 w-4 text-blue-500" /> Force Update Active</p>
+                <p className="text-sm text-muted-foreground">When on, users below the min version cannot proceed</p>
+              </div>
+              <Switch
+                checked={forceUpdateEnabled}
+                onCheckedChange={v => { setForceUpdateEnabled(v); save({ forceUpdateEnabled: v }); }}
+              />
+            </div>
+
+            <Button
+              onClick={() => save({ logoUrl: logoUrl || null, currentAppVersion, minRequiredVersion, updateDownloadLink: updateDownloadLink || null, forceUpdateEnabled })}
+              disabled={saving}
+              variant="outline"
+              className="border-blue-200 text-blue-700 hover:bg-blue-50"
+            >
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              Save App Configuration
+            </Button>
           </CardContent>
         </Card>
 

@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Mail, User, Phone, MessageSquare, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Loader2, Mail, User, Phone, MessageSquare, Lock, Eye, EyeOff, AlertCircle, AlertTriangle } from "lucide-react";
 
 const BASE = "";
 
@@ -23,6 +24,7 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [referralCode, setReferralCode] = useState("");
+  const [agreedToPolicy, setAgreedToPolicy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
@@ -44,7 +46,6 @@ export default function Register() {
     if (countdown > 0) { const t = setTimeout(() => setCountdown(c => c - 1), 1000); return () => clearTimeout(t); }
   }, [countdown]);
 
-  // Prefill referral from URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const ref = params.get("ref");
@@ -58,6 +59,9 @@ export default function Register() {
     }
     if (password.length < 6) { toast({ title: "Password must be at least 6 characters", variant: "destructive" }); return; }
     if (!/^\d{10,15}$/.test(phone.replace(/\s/g, ""))) { toast({ title: "Enter a valid mobile number", variant: "destructive" }); return; }
+    if (!agreedToPolicy) {
+      toast({ title: "Agreement required", description: "Please agree to our No Refund, No Exchange, No Return policy to continue.", variant: "destructive" }); return;
+    }
 
     setLoading(true);
     try {
@@ -71,7 +75,7 @@ export default function Register() {
       setRegisteredEmail(email.trim().toLowerCase());
       setOtpSent(true);
       setCountdown(60);
-      if (data.verificationCode) setDevOtp(data.verificationCode); // dev only
+      if (data.verificationCode) setDevOtp(data.verificationCode);
       toast({ title: data.otpSent ? "OTP sent to your email!" : "Registration successful!", description: data.message });
     } catch (e: any) {
       toast({ title: "Registration failed", description: e.message, variant: "destructive" });
@@ -136,7 +140,6 @@ export default function Register() {
     </div>
   );
 
-  // OTP Verification Step
   if (otpSent) return (
     <div className="flex min-h-screen items-center justify-center bg-muted/50 p-4">
       <Card className="w-full max-w-md shadow-lg">
@@ -183,7 +186,6 @@ export default function Register() {
     </div>
   );
 
-  // Registration Form
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/50 p-4">
       <Card className="w-full max-w-md shadow-lg">
@@ -193,7 +195,6 @@ export default function Register() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleRegister} className="space-y-4">
-            {/* Name */}
             <div className="space-y-1.5">
               <Label>Full Name *</Label>
               <div className="relative">
@@ -202,7 +203,6 @@ export default function Register() {
               </div>
             </div>
 
-            {/* Mobile */}
             <div className="space-y-1.5">
               <Label>Mobile Number *</Label>
               <div className="relative">
@@ -211,7 +211,6 @@ export default function Register() {
               </div>
             </div>
 
-            {/* WhatsApp */}
             <div className="space-y-1.5">
               <Label>WhatsApp Number <span className="text-muted-foreground text-xs">(leave blank if same as mobile)</span></Label>
               <div className="relative">
@@ -220,7 +219,6 @@ export default function Register() {
               </div>
             </div>
 
-            {/* Email */}
             <div className="space-y-1.5">
               <Label>Email Address *</Label>
               <div className="relative">
@@ -230,7 +228,6 @@ export default function Register() {
               <p className="text-xs text-muted-foreground">A 6-digit OTP will be sent to verify this email.</p>
             </div>
 
-            {/* Password */}
             <div className="space-y-1.5">
               <Label>Password *</Label>
               <div className="relative">
@@ -242,13 +239,37 @@ export default function Register() {
               </div>
             </div>
 
-            {/* Referral */}
             <div className="space-y-1.5">
               <Label>Referral Code <span className="text-muted-foreground text-xs">(optional)</span></Label>
               <Input value={referralCode} onChange={e => setReferralCode(e.target.value.toUpperCase())} placeholder="ABCD1234" />
             </div>
 
-            <Button type="submit" className="w-full text-base h-11" disabled={loading}>
+            {/* Mandatory policy agreement */}
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg space-y-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-red-700">Platform Policies</p>
+                  <p className="text-xs text-red-600 mt-1 leading-relaxed">
+                    <strong>No Refund Policy:</strong> All payments are final and non-reimbursable.<br />
+                    <strong>No Exchange Policy:</strong> Items cannot be swapped or substituted.<br />
+                    <strong>No Return Policy:</strong> Once processed, orders cannot be returned.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="policy-agree"
+                  checked={agreedToPolicy}
+                  onCheckedChange={(v) => setAgreedToPolicy(!!v)}
+                />
+                <label htmlFor="policy-agree" className="text-xs font-medium text-red-800 cursor-pointer">
+                  I have read and agree to the No Refund, No Exchange, No Return policy
+                </label>
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full text-base h-11" disabled={loading || !agreedToPolicy}>
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Create Account & Send OTP
             </Button>

@@ -95,7 +95,7 @@ export default function ProductDetailScreen() {
         </View>
 
         {/* Content */}
-        <View style={[styles.content, { paddingBottom: 140 }]}>
+        <View style={[styles.content, { paddingBottom: 160 }]}>
           {product.metadata?.category ? (
             <Text style={[styles.category, { color: colors.accent }]}>
               {product.metadata.category}
@@ -144,6 +144,12 @@ export default function ProductDetailScreen() {
             </>
           ) : null}
 
+          {/* Mandatory policy notice — fixed on every product */}
+          <View style={[styles.policyBox, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+            <Feather name="alert-triangle" size={15} color="#DC2626" style={{ marginTop: 1 }} />
+            <Text style={styles.policyText}>No Refund · No Exchange · No Return</Text>
+          </View>
+
           {/* Metadata tags */}
           {Object.entries(product.metadata ?? {}).filter(([k]) => !['badge'].includes(k)).length > 0 && (
             <View style={styles.tags}>
@@ -171,6 +177,10 @@ export default function ProductDetailScreen() {
           },
         ]}
       >
+        {/* Policy reminder directly above the button */}
+        <Text style={[styles.footerPolicy, { color: '#DC2626' }]}>
+          No Refund · No Exchange · No Return — All sales are final
+        </Text>
         <TouchableOpacity
           style={[
             styles.addBtn,
@@ -209,10 +219,13 @@ const styles = StyleSheet.create({
   priceOption: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5 },
   sectionLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
   description: { fontSize: 15, fontFamily: 'Inter_400Regular', lineHeight: 24, marginBottom: 20 },
+  policyBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 12, borderRadius: 10, borderWidth: 1, marginBottom: 16 },
+  policyText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#DC2626', flex: 1 },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   tag: { flexDirection: 'row', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1 },
   tagText: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, padding: 20 },
+  footer: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, padding: 16, gap: 10 },
+  footerPolicy: { fontSize: 11, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
   addBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16, borderRadius: 14 },
   addBtnText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
 });

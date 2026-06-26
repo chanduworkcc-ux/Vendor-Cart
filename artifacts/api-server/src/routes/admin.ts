@@ -36,6 +36,11 @@ router.get("/admin/settings", requireAdmin, async (_req, res) => {
       paymentGateway: settings.paymentGateway,
       razorpayKeyId: settings.razorpayKeyId,
       stripePublishableKey: settings.stripePublishableKey,
+      logoUrl: settings.logoUrl,
+      currentAppVersion: settings.currentAppVersion,
+      minRequiredVersion: settings.minRequiredVersion,
+      updateDownloadLink: settings.updateDownloadLink,
+      forceUpdateEnabled: settings.forceUpdateEnabled,
       updatedAt: settings.updatedAt.toISOString(),
     });
   } catch { res.status(500).json({ error: "Failed to get settings" }); }
@@ -51,6 +56,7 @@ router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
       loginEnabled, signupEnabled, autoApproveRegistrations,
       guestModeEnabled, minOrderAmount, codEnabled, paymentGateway,
       razorpayKeyId, razorpayKeySecret, stripePublishableKey, stripeSecretKey,
+      logoUrl, currentAppVersion, minRequiredVersion, updateDownloadLink, forceUpdateEnabled,
     } = req.body;
 
     const [updated] = await db.update(adminSettingsTable).set({
@@ -74,6 +80,11 @@ router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
       razorpayKeySecret: razorpayKeySecret !== undefined ? (razorpayKeySecret || null) : settings.razorpayKeySecret,
       stripePublishableKey: stripePublishableKey !== undefined ? (stripePublishableKey || null) : settings.stripePublishableKey,
       stripeSecretKey: stripeSecretKey !== undefined ? (stripeSecretKey || null) : settings.stripeSecretKey,
+      logoUrl: logoUrl !== undefined ? (logoUrl || null) : settings.logoUrl,
+      currentAppVersion: currentAppVersion !== undefined ? currentAppVersion : settings.currentAppVersion,
+      minRequiredVersion: minRequiredVersion !== undefined ? minRequiredVersion : settings.minRequiredVersion,
+      updateDownloadLink: updateDownloadLink !== undefined ? (updateDownloadLink || null) : settings.updateDownloadLink,
+      forceUpdateEnabled: forceUpdateEnabled !== undefined ? forceUpdateEnabled : settings.forceUpdateEnabled,
       updatedAt: new Date(),
     }).where(eq(adminSettingsTable.id, settings.id)).returning();
 
@@ -104,6 +115,11 @@ router.patch("/admin/settings", requireAdmin, async (req: AuthRequest, res) => {
       paymentGateway: updated.paymentGateway,
       razorpayKeyId: updated.razorpayKeyId,
       stripePublishableKey: updated.stripePublishableKey,
+      logoUrl: updated.logoUrl,
+      currentAppVersion: updated.currentAppVersion,
+      minRequiredVersion: updated.minRequiredVersion,
+      updateDownloadLink: updated.updateDownloadLink,
+      forceUpdateEnabled: updated.forceUpdateEnabled,
       updatedAt: updated.updatedAt.toISOString(),
     });
   } catch { res.status(500).json({ error: "Failed to update settings" }); }

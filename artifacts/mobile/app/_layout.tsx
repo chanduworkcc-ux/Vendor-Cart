@@ -19,17 +19,39 @@ import { CartProvider } from "@/context/CartContext";
 import { WishlistProvider } from "@/context/WishlistContext";
 import { UserProvider } from "@/context/UserContext";
 import { AdminProvider } from "@/context/AdminContext";
+import ForceUpdateScreen from "./force-update";
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+const APP_VERSION = "1.0.0";
+
+function compareVersions(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] ?? 0;
+    const nb = pb[i] ?? 0;
+    if (na !== nb) return na - nb;
+  }
+  return 0;
+}
+
+interface RemoteConfig {
+  logoUrl: string | null;
+  currentAppVersion: string;
+  minRequiredVersion: string;
+  updateDownloadLink: string | null;
+  forceUpdateEnabled: boolean;
+}
 
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="product/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="admin/login" options={{ headerShown: false, presentation: 'modal' }} />
+      <Stack.Screen name="admin/login" options={{ headerShown: false, presentation: "modal" }} />
       <Stack.Screen name="admin/dashboard" options={{ headerShown: false }} />
       <Stack.Screen name="admin/products" options={{ headerShown: false }} />
       <Stack.Screen name="admin/orders" options={{ headerShown: false }} />
@@ -49,6 +71,9 @@ export default function RootLayout() {
     Inter_700Bold,
   });
   const [showLoader, setShowLoader] = useState(true);
+  const [remoteConfig, setRemoteConfig] = useState<RemoteConfig | null>(null);
+  const [forceUpdate, setForceUpdate] = useState(false);
+  const [configLoaded, setConfigLoaded] = useState(false);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
@@ -58,12 +83,40 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
+  useEffect(() => {
+    const domain = process.env.EXPO_PUBLIC_DOMAIN;
+    if (!domain) { setConfigLoaded(true); return; }
+
+    fetch(`https://${domain}/api/config`)
+      .then(r => r.json())
+      .then((config: RemoteConfig) => {
+        setRemoteConfig(config);
+        if (config.forceUpdateEnabled && config.minRequiredVersion) {
+          const needsUpdate = compareVersions(APP_VERSION, config.minRequiredVersion) < 0;
+          if (needsUpdate) setForceUpdate(true);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setConfigLoaded(true));
+  }, []);
+
   if (!fontsLoaded && !fontError) return null;
 
   if (showLoader) {
     return (
       <SafeAreaProvider>
         <LoadingScreen />
+      </SafeAreaProvider>
+    );
+  }
+
+  if (forceUpdate && remoteConfig?.updateDownloadLink) {
+    return (
+      <SafeAreaProvider>
+        <ForceUpdateScreen
+          downloadLink={remoteConfig.updateDownloadLink}
+          logoUrl={remoteConfig.logoUrl}
+        />
       </SafeAreaProvider>
     );
   }

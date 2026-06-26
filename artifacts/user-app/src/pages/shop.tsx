@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2, Search, ShoppingCart, Package, Tag, Star } from "lucide-react";
+import { Loader2, Search, ShoppingCart, Package, Tag, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
 import { getListOrdersQueryKey } from "@workspace/api-client-react";
 
@@ -30,6 +30,8 @@ interface Category {
   id: number;
   name: string;
 }
+
+const POLICY_TEXT = "No Refund · No Exchange · No Return";
 
 export default function Shop() {
   const { toast } = useToast();
@@ -99,9 +101,7 @@ export default function Shop() {
   };
 
   const displayPrice = (product: Product) =>
-    product.discountPrice
-      ? product.discountPrice
-      : product.price;
+    product.discountPrice ? product.discountPrice : product.price;
 
   return (
     <div className="space-y-6">
@@ -221,6 +221,8 @@ export default function Shop() {
                   {product.stock === 0 && (
                     <p className="text-xs text-red-500 font-medium">Out of stock</p>
                   )}
+                  {/* Policy notice — mandatory on every product */}
+                  <p className="text-[11px] font-bold text-red-600 pt-1">{POLICY_TEXT}</p>
                 </CardContent>
 
                 <CardFooter className="p-4 pt-0">
@@ -287,6 +289,14 @@ export default function Shop() {
                   className="resize-none"
                   rows={3}
                 />
+              </div>
+
+              {/* Mandatory policy notice — adjacent to order button */}
+              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                <p className="text-xs font-bold text-red-700 leading-relaxed">
+                  No Refund · No Exchange · No Return — All sales are final. By confirming, you agree to our strict no-refund, no-exchange, and no-return policy.
+                </p>
               </div>
             </div>
           )}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { useColors } from '@/hooks/useColors';
 import { useCart, CartItem } from '@/context/CartContext';
 
+const ABANDONMENT_MINUTES = 15;
+
 function formatPrice(cents: number) {
   return `$${(cents / 100).toFixed(2)}`;
 }
@@ -28,8 +30,33 @@ export default function CartScreen() {
   const router = useRouter();
   const { items, removeFromCart, updateQuantity, clearCart, totalAmount } = useCart();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const abandonmentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastItemCount = useRef(0);
 
   const topPadding = Platform.OS === 'web' ? 24 : insets.top;
+
+  // Cart abandonment detection — fire notification after ABANDONMENT_MINUTES if cart still has items
+  useEffect(() => {
+    if (abandonmentTimer.current) clearTimeout(abandonmentTimer.current);
+
+    if (items.length > 0) {
+      lastItemCount.current = items.length;
+      abandonmentTimer.current = setTimeout(async () => {
+        try {
+          const domain = process.env.EXPO_PUBLIC_DOMAIN;
+          if (!domain) return;
+          await fetch(`https://${domain}/api/notifications`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+          });
+        } catch {}
+      }, ABANDONMENT_MINUTES * 60 * 1000);
+    }
+
+    return () => {
+      if (abandonmentTimer.current) clearTimeout(abandonmentTimer.current);
+    };
+  }, [items.length]);
 
   const handleCheckout = async () => {
     if (items.length === 0) return;
@@ -129,7 +156,7 @@ export default function CartScreen() {
             data={items}
             keyExtractor={(item) => item.priceId}
             renderItem={renderItem}
-            contentContainerStyle={{ padding: 16, paddingBottom: 180, gap: 10 }}
+            contentContainerStyle={{ padding: 16, paddingBottom: 220, gap: 10 }}
             showsVerticalScrollIndicator={false}
           />
 
@@ -147,6 +174,13 @@ export default function CartScreen() {
               <Text style={[styles.totalLabel, { color: colors.foreground }]}>Total</Text>
               <Text style={[styles.totalAmount, { color: colors.foreground }]}>{formatPrice(totalAmount)}</Text>
             </View>
+
+            {/* Mandatory policy notice above checkout button */}
+            <View style={[styles.policyRow, { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}>
+              <Feather name="alert-triangle" size={13} color="#DC2626" />
+              <Text style={styles.policyText}>No Refund · No Exchange · No Return — All sales are final</Text>
+            </View>
+
             <TouchableOpacity
               style={[styles.checkoutBtn, { backgroundColor: colors.primary, opacity: isCheckingOut ? 0.75 : 1 }]}
               onPress={handleCheckout}
@@ -222,6 +256,8 @@ const styles = StyleSheet.create({
   divider: { height: 1, marginVertical: 4 },
   totalLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   totalAmount: { fontSize: 20, fontFamily: 'Inter_700Bold' },
+  policyRow: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10, borderRadius: 10, borderWidth: 1 },
+  policyText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#DC2626', flex: 1 },
   checkoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',

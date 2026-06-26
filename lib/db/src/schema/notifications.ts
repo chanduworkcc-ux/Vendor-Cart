@@ -20,9 +20,16 @@ export const notificationsTable = pgTable("notifications", {
   message: text("message").notNull(),
   type: notificationTypeEnum("type").notNull().default("info"),
   isRead: boolean("is_read").notNull().default(false),
+  // Analytics tracking
+  impressions: integer("impressions").notNull().default(0),
+  clicks: integer("clicks").notNull().default(0),
+  // Marketing enrichment
+  imageUrl: text("image_url"),
+  deepLink: text("deep_link"),
+  productId: integer("product_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const insertNotificationSchema = createInsertSchema(notificationsTable).omit({ id: true, createdAt: true });
+export const insertNotificationSchema = createInsertSchema(notificationsTable).omit({ id: true, createdAt: true, impressions: true, clicks: true });
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notificationsTable.$inferSelect;

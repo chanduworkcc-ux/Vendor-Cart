@@ -13,9 +13,11 @@ import couponsRouter from "./coupons";
 import tokensRouter from "./tokens";
 import productsRouter from "./products";
 import announcementsRouter from "./announcements";
+import configRouter from "./config";
 
 const router: IRouter = Router();
 
+router.use(configRouter);
 router.use(healthRouter);
 router.use(authRouter);
 router.use(usersRouter);

@@ -24,6 +24,12 @@ export const adminSettingsTable = pgTable("admin_settings", {
   razorpayKeySecret: text("razorpay_key_secret"),
   stripePublishableKey: text("stripe_publishable_key"),
   stripeSecretKey: text("stripe_secret_key"),
+  // Remote config & forced update
+  logoUrl: text("logo_url"),
+  currentAppVersion: text("current_app_version").notNull().default("1.0.0"),
+  minRequiredVersion: text("min_required_version").notNull().default("1.0.0"),
+  updateDownloadLink: text("update_download_link"),
+  forceUpdateEnabled: boolean("force_update_enabled").notNull().default(false),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
